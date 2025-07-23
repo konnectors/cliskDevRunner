@@ -184,4 +184,102 @@ describe('Handshake Connector Tests', () => {
     await new Promise(resolve => setTimeout(resolve, 500));
     assert.ok(true, 'System should remain responsive after ping');
   });
+
+  test('should handle worker and pilot pages simultaneously', async () => {
+    // Arrange
+    let workerPingCalled = false;
+    let pilotPingCalled = false;
+    let workerPingResponse = null;
+    let pilotPingResponse = null;
+    
+    // Create test pages with spies for both worker and pilot
+    class WorkerTestPage extends CliskPage {
+      getLocalMethods() {
+        const methods = super.getLocalMethods();
+        const originalPing = methods.ping;
+        methods.ping = (...args) => {
+          workerPingCalled = true;
+          workerPingResponse = originalPing.call(this, ...args);
+          return workerPingResponse;
+        };
+        return methods;
+      }
+    }
+
+    class PilotTestPage extends CliskPage {
+      getLocalMethods() {
+        const methods = super.getLocalMethods();
+        const originalPing = methods.ping;
+        methods.ping = (...args) => {
+          pilotPingCalled = true;
+          pilotPingResponse = originalPing.call(this, ...args);
+          return pilotPingResponse;
+        };
+        return methods;
+      }
+    }
+
+    const workerPage = new WorkerTestPage(context, 'worker');
+    const pilotPage = new PilotTestPage(context, 'pilot');
+    
+    try {
+      // Act - Initialize pages sequentially (to avoid Playwright exposeFunction conflicts)
+      await workerPage.init();
+      await pilotPage.init();
+
+      // Navigate both pages
+      await Promise.all([
+        workerPage.navigate('about:blank'),
+        pilotPage.navigate('about:blank')
+      ]);
+
+      // Load connectors on both pages in parallel
+      const [workerManifest, pilotManifest] = await Promise.all([
+        workerPage.loadConnector('examples/handshake-konnector', loadConnector),
+        pilotPage.loadConnector('examples/handshake-konnector', loadConnector)
+      ]);
+
+      // Initiate handshakes in parallel
+      const [workerConnection, pilotConnection] = await Promise.all([
+        workerPage.initiateHandshake(),
+        pilotPage.initiateHandshake()
+      ]);
+
+      // Wait for connectors to initialize and call ping
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Assert - Validate manifests
+      assert.strictEqual(typeof workerManifest, 'object', 'Worker manifest should be loaded');
+      assert.strictEqual(workerManifest.name, 'Template', 'Worker should load handshake-konnector');
+      assert.strictEqual(workerManifest.version, '1.0.0', 'Worker should have correct version');
+      
+      assert.strictEqual(typeof pilotManifest, 'object', 'Pilot manifest should be loaded');
+      assert.strictEqual(pilotManifest.name, 'Template', 'Pilot should load handshake-konnector');
+      assert.strictEqual(pilotManifest.version, '1.0.0', 'Pilot should have correct version');
+
+      // Assert - Validate connections
+      assert.ok(workerConnection, 'Worker connection should be established');
+      assert.ok(pilotConnection, 'Pilot connection should be established');
+
+      // Assert - Validate ping calls
+      assert.strictEqual(workerPingCalled, true, 'Worker ping method should have been called');
+      assert.strictEqual(pilotPingCalled, true, 'Pilot ping method should have been called');
+      
+      // Assert - Validate ping responses
+      assert.strictEqual(typeof workerPingResponse, 'string', 'Worker ping should return a string response');
+      assert.strictEqual(typeof pilotPingResponse, 'string', 'Pilot ping should return a string response');
+      assert.ok(workerPingResponse.includes('worker'), 'Worker ping response should include "worker"');
+      assert.ok(pilotPingResponse.includes('pilot'), 'Pilot ping response should include "pilot"');
+
+      // Assert - Validate isolation (responses should be different)
+      assert.notStrictEqual(workerPingResponse, pilotPingResponse, 'Worker and pilot should have different ping responses');
+      
+    } finally {
+      // Cleanup both pages
+      await Promise.all([
+        workerPage.close(),
+        pilotPage.close()
+      ]);
+    }
+  });
 }); 

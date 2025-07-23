@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "test": "node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js",
-    "test:verbose": "node --test --test-reporter verbose test/*.test.js"
+    "test:verbose": "node --test --test-reporter=spec test/*.test.js"
   },
   "keywords": [
     "playwright",

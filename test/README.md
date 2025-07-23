@@ -29,6 +29,13 @@ Tests principaux qui valident :
    - Teste l'établissement de la connexion post-me
    - Valide que le système reste réactif
 
+6. **Worker et Pilot simultanés** ⭐
+   - Crée deux pages indépendantes (worker et pilot)
+   - Valide les handshakes simultanés sur les deux pages
+   - Confirme que `ping()` est appelée sur chaque page
+   - Vérifie l'isolation complète entre les pages
+   - Teste l'architecture multi-pages en conditions réelles
+
 ## 🚀 Utilisation
 
 ### Exécuter tous les tests
@@ -95,14 +102,15 @@ describe('Mon Test Custom', () => {
 
 ```
 ▶ Handshake Connector Tests
-  ✔ should load handshake connector and call ping function (5572ms)
-  ✔ should handle connector events (5557ms)
+  ✔ should load handshake connector and call ping function (5574ms)
+  ✔ should handle connector events (5549ms)
   ✔ should support multiple method calls (5552ms)
-  ✔ should establish connection and respond to ping (5049ms)
-✔ Handshake Connector Tests (21852ms)
-ℹ tests 4
+  ✔ should establish connection and respond to ping (5048ms)
+  ✔ should handle worker and pilot pages simultaneously (6581ms)
+✔ Handshake Connector Tests (28424ms)
+ℹ tests 5
 ℹ suites 1
-ℹ pass 4
+ℹ pass 5
 ℹ fail 0
 ```
 
