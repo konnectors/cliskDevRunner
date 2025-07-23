@@ -1,68 +1,15 @@
-import { chromium } from 'playwright';
-import { readFileSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { ParentHandshake, debug as postMeDebug } from 'post-me';
+/**
+ * Communication Module
+ * Handles post-me communication setup and handshake with connectors
+ */
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configuration
-const CONNECTOR_PATH = process.argv[2] || 'examples/handshake-konnector';
-
-async function main() {
-  console.log('🚀 Starting HandshakeTester...');
-  console.log(`📁 Using connector: ${CONNECTOR_PATH}`);
-
-  // Launch browser
-  const browser = await chromium.launch({ 
-    headless: false,
-    args: ['--no-sandbox', '--disable-web-security']
-  });
-  
-  const context = await browser.newContext({
-    // Simulate mobile webview environment as per user memory
-    userAgent: 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-    viewport: { width: 375, height: 667 }
-  });
-
-  const page = await context.newPage();
-
-  // Setup console logging from page
-  page.on('console', msg => {
-    const type = msg.type();
-    const text = msg.text();
-    console.log(`📄 [Console ${type}]`, text);
-  });
-
-  // Setup ReactNativeWebView.postMessage simulation and post-me communication
-  await setupPostMeCommunication(page);
-  
-  // Navigate to about:blank
-  await page.goto('about:blank');
-
-  // Load and inject connector code
-  await loadConnector(page, CONNECTOR_PATH);
-
-  // Initiate the handshake after connector is loaded
-  await initiateHandshake(page);
-
-  // Keep the browser open for testing
-  console.log('✅ Setup complete! Browser will stay open for testing...');
-  console.log('Press Ctrl+C to close');
-
-  // Handle graceful shutdown
-  process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down...');
-    await browser.close();
-    process.exit(0);
-  });
-}
+import { ParentHandshake } from 'post-me';
 
 /**
  * Setup ReactNativeWebView.postMessage simulation and post-me communication bridge
+ * @param {Page} page - Playwright page instance
  */
-async function setupPostMeCommunication(page) {
+export async function setupPostMeCommunication(page) {
   console.log('🔗 Setting up post-me communication bridge...');
   
   // Initialize global handler
@@ -113,13 +60,12 @@ async function setupPostMeCommunication(page) {
 }
 
 /**
- * Initiate post-me handshake using ParentHandshake
+ * Create a messenger that bridges Playwright with the page
+ * @param {Page} page - Playwright page instance
+ * @returns {Object} Messenger object compatible with post-me
  */
-async function initiateHandshake(page) {
-  console.log('🤝 Initiating post-me handshake...');
-  
-  // Create a custom messenger that bridges Playwright with the page
-  const messenger = {
+function createPlaywrightMessenger(page) {
+  return {
     postMessage: async (message, transfer) => {
       console.log('➡️ [Playwright→Page] Sending message:', message);
       
@@ -145,9 +91,14 @@ async function initiateHandshake(page) {
       };
     }
   };
+}
 
-  // Setup local methods that can be called by the connector
-  const localMethods = {
+/**
+ * Get the local methods that can be called by the connector
+ * @returns {Object} Object containing methods exposed to the connector
+ */
+function getLocalMethods() {
+  return {
     // Method that connector can call
     ping: () => {
       console.log('🏓 [Playwright] Ping received from connector!');
@@ -165,11 +116,33 @@ async function initiateHandshake(page) {
       return { success: true, timestamp: Date.now(), echo: data };
     }
   };
+}
+
+/**
+ * Initiate post-me handshake using ParentHandshake
+ * @param {Page} page - Playwright page instance
+ * @param {Object} options - Configuration options
+ * @param {number} options.maxAttempts - Maximum handshake attempts
+ * @param {number} options.attemptInterval - Interval between attempts in ms
+ * @param {number} options.waitTime - Time to wait before starting handshake in ms
+ * @returns {Promise<Connection>} Post-me connection object
+ */
+export async function initiateHandshake(page, options = {}) {
+  const {
+    maxAttempts = 10,
+    attemptInterval = 1000,
+    waitTime = 3000
+  } = options;
+
+  console.log('🤝 Initiating post-me handshake...');
+  
+  const messenger = createPlaywrightMessenger(page);
+  const localMethods = getLocalMethods();
 
   try {
     // Wait a bit for the connector to be ready
     console.log('⏳ Waiting for connector to initialize...');
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(waitTime);
     
     // Initiate handshake from parent side (Playwright)
     console.log('🚀 [Playwright] Initiating ParentHandshake...');
@@ -177,8 +150,8 @@ async function initiateHandshake(page) {
     const connection = await ParentHandshake(
       messenger,
       localMethods,
-      10, // max attempts
-      1000 // attempt interval in ms
+      maxAttempts,
+      attemptInterval
     );
     
     console.log('✅ [Playwright] Post-me handshake successful!');
@@ -210,41 +183,11 @@ async function initiateHandshake(page) {
     // Store connection globally for potential future use
     global.postMeConnection = connection;
     
+    return connection;
+    
   } catch (error) {
     console.error('❌ [Playwright] Post-me handshake failed:', error);
     console.error('Stack trace:', error.stack);
-  }
-}
-
-/**
- * Load and inject connector code into the page
- */
-async function loadConnector(page, connectorPath) {
-  console.log(`📦 Loading connector from ${connectorPath}...`);
-  
-  try {
-    // Read connector main.js file
-    const mainJsPath = path.join(__dirname, connectorPath, 'main.js');
-    const connectorCode = readFileSync(mainJsPath, 'utf8');
-    
-    // Read manifest
-    const manifestPath = path.join(__dirname, connectorPath, 'manifest.konnector');
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    
-    console.log(`📋 Connector: ${manifest.name} v${manifest.version}`);
-    
-    // Inject connector code
-    await page.addScriptTag({
-      content: connectorCode
-    });
-    
-    console.log('✅ Connector code injected successfully');
-    
-  } catch (error) {
-    console.error('❌ Error loading connector:', error.message);
     throw error;
   }
-}
-
-// Start the application
-main().catch(console.error); 
+} 
