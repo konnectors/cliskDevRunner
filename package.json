@@ -1,0 +1,21 @@
+{
+  "name": "handshake-tester",
+  "version": "1.0.0",
+  "description": "Projet simple pour tester les connecteurs avec playwright et post-me",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node index.js"
+  },
+  "keywords": ["playwright", "post-me", "connector", "handshake"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "post-me": "^0.4.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+} 

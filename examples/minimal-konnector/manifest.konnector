@@ -1,0 +1,25 @@
+{
+  "name": "MinimalDebugConnector",
+  "slug": "minimal-debug",
+  "type": "konnector",
+  "version": "1.0.0",
+  "description": "Minimal connector for debugging post-me handshake",
+  "homepage": "https://example.com",
+  "author": "Debug Team",
+  "license": "MIT",
+  "main": "main.js",
+  "category": "debug",
+  "tags": ["debug", "handshake", "post-me"],
+  "screenshots": [],
+  "locales": {
+    "en": {
+      "name": "Minimal Debug Connector",
+      "description": "Minimal connector for debugging post-me handshake"
+    }
+  },
+  "permissions": {},
+  "doctypes": [],
+  "qualification_labels": [],
+  "features": [],
+  "fields": {}
+} 
