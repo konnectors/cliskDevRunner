@@ -1,8 +1,7 @@
 import { chromium } from 'playwright';
 import debug from 'debug';
-import { setupConsoleLogging } from './console-logger.js';
 import { loadConnector } from './connector-loader.js';
-import { setupPostMeCommunication, initiateHandshake } from './communication.js';
+import { CliskPage } from './clisk-page.js';
 
 const log = debug('handshake:main');
 
@@ -25,39 +24,43 @@ async function main() {
     viewport: { width: 375, height: 667 }
   });
 
-  const page = await context.newPage();
-
-  // Setup console logging from page
-  setupConsoleLogging(page);
-
-  // Setup ReactNativeWebView.postMessage simulation and post-me communication
-  await setupPostMeCommunication(page);
+  // Create a CliskPage instance
+  const mainPage = new CliskPage(context, 'main');
   
-  // Navigate to about:blank
-  await page.goto('about:blank');
+  try {
+    // Initialize the page
+    await mainPage.init();
 
-  // Load and inject connector code
-  const manifest = await loadConnector(page, CONNECTOR_PATH);
+    // Navigate to about:blank
+    await mainPage.navigate('about:blank');
 
-  // Initiate the handshake after connector is loaded
-  const connection = await initiateHandshake(page);
+    // Load and inject connector code
+    const manifest = await mainPage.loadConnector(CONNECTOR_PATH, loadConnector);
 
-  // Keep the browser open for testing
-  log('✅ Setup complete! Browser will stay open for testing...');
-  log('Press Ctrl+C to close');
+    // Initiate the handshake
+    const connection = await mainPage.initiateHandshake();
 
-  // Handle graceful shutdown
-  process.on('SIGINT', async () => {
-    log('\n🛑 Shutting down...');
+    // Keep the browser open for testing
+    log('✅ Setup complete! Browser will stay open for testing...');
+    log('Press Ctrl+C to close');
+
+    // Handle graceful shutdown
+    process.on('SIGINT', async () => {
+      log('\n🛑 Shutting down...');
+      
+      // Cleanup page
+      await mainPage.close();
+      
+      await browser.close();
+      process.exit(0);
+    });
     
-    // Cleanup connection if it exists
-    if (connection) {
-      connection.close();
-    }
-    
+  } catch (error) {
+    console.error('❌ Setup failed:', error);
+    await mainPage.close();
     await browser.close();
-    process.exit(0);
-  });
+    process.exit(1);
+  }
 }
 
 // Start the application
