@@ -76,6 +76,9 @@ async function main() {
     // Keep the browser open for testing
     log('✅ Setup complete! Both pages are open for testing...');
     log('🖥️  You should see two browser tabs: worker and pilot');
+    log('🔄 Auto-reconnection is ENABLED on both pages');
+    log('💡 Test it: Navigate to any URL in either tab - the connector will auto-reconnect!');
+    log('📊 Monitor reconnection: DEBUG=clisk:worker:nav,clisk:pilot:nav yarn start');
     log('Press Ctrl+C to close');
 
     // Handle graceful shutdown

@@ -30,12 +30,20 @@ export class CliskPage {
     this.pageLog = debug(`clisk:${pageName}:page`);
     this.messageLog = debug(`clisk:${pageName}:message`);
     this.commLog = debug(`clisk:${pageName}:comm`);
+    this.navLog = debug(`clisk:${pageName}:nav`);
     
     // Instance variables for isolated state
     this.page = null;
     this.connection = null;
     this.messageHandler = null;
     this.isInitialized = false;
+    this.functionsExposed = false; // Track if functions have been exposed
+    
+    // Auto-reconnection state
+    this.connectorPath = null;
+    this.loaderFunction = null;
+    this.isAutoReconnectEnabled = false;
+    this.currentUrl = null;
   }
 
   /**
@@ -79,15 +87,28 @@ export class CliskPage {
    * Load and inject connector code
    * @param {string} connectorPath - Path to the connector directory
    * @param {Function} loaderFunction - Function to load the connector
+   * @param {boolean} enableAutoReconnect - Enable automatic reconnection on URL changes
    */
-  async loadConnector(connectorPath, loaderFunction) {
+  async loadConnector(connectorPath, loaderFunction, enableAutoReconnect = true) {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before loading connector');
     }
     
     this.log('📦 Loading connector: %s', connectorPath);
+    
+    // Store connector details for potential reconnection
+    this.connectorPath = connectorPath;
+    this.loaderFunction = loaderFunction;
+    this.isAutoReconnectEnabled = enableAutoReconnect;
+    
     const manifest = await loaderFunction(this.page, connectorPath);
     this.log('📋 Loaded: %s v%s', manifest.name, manifest.version);
+    
+    // Start monitoring URL changes if auto-reconnect is enabled
+    if (enableAutoReconnect) {
+      this.setupUrlChangeMonitoring();
+    }
+    
     return manifest;
   }
 
@@ -201,26 +222,48 @@ export class CliskPage {
 
   /**
    * Setup post-me communication bridge for this page
+   * @param {boolean} exposeFunction - Whether to expose functions (default: true)
    * @private
    */
-  async setupPostMeCommunication() {
+  async setupPostMeCommunication(exposeFunctions = true) {
     this.commLog('🔗 Setting up post-me communication bridge...');
     
-    // Expose functions directly on this page
-    await this.page.exposeFunction('sendToPlaywright', (data) => {
-      if (this.messageHandler) {
-        this.messageHandler(data);
-      }
-    });
+    // Only expose functions if requested and not already exposed
+    if (exposeFunctions && !this.functionsExposed) {
+      // Expose functions directly on this page
+      await this.page.exposeFunction('sendToPlaywright', (data) => {
+        if (this.messageHandler) {
+          this.messageHandler(data);
+        }
+      });
+      
+      await this.page.exposeFunction('sendPageLog', (level, ...args) => {
+        if (level === 'error') {
+          console.error(`[${this.pageName} Page Error]`, ...args);
+        } else {
+          this.pageLog(`[${level}] %o`, args);
+        }
+      });
+      
+      this.functionsExposed = true;
+      this.commLog('🔧 Functions exposed for %s', this.pageName);
+    } else if (exposeFunctions) {
+      this.commLog('✅ Functions already exposed for %s, skipping', this.pageName);
+    } else {
+      this.commLog('⏭️ Skipping function exposure for %s (reconnection mode)', this.pageName);
+    }
     
-    await this.page.exposeFunction('sendPageLog', (level, ...args) => {
-      if (level === 'error') {
-        console.error(`[${this.pageName} Page Error]`, ...args);
-      } else {
-        this.pageLog(`[${level}] %o`, args);
-      }
-    });
+    // Always inject the page script (this is safe to re-inject)
+    await this.injectPageScript();
     
+    this.commLog('🔧 Setup completed for %s', this.pageName);
+  }
+
+  /**
+   * Inject the page-specific initialization script
+   * @private
+   */
+  async injectPageScript() {
     // Inject page-specific initialization script
     const initScript = `
       console.log('[DEBUG] Init script starting for ${this.pageName}');
@@ -239,7 +282,7 @@ export class CliskPage {
         }
       };
       
-      // Test if global functions are available
+      // Test if functions are available
       console.log('[DEBUG] Checking functions for ${this.pageName}');
       console.log('[DEBUG] sendToPlaywright available:', typeof window.sendToPlaywright);
       console.log('[DEBUG] sendPageLog available:', typeof window.sendPageLog);
@@ -287,6 +330,139 @@ export class CliskPage {
     
     await this.page.addInitScript(initScript);
     this.commLog('🔧 Setup script injected for %s', this.pageName);
+  }
+
+  /**
+   * Setup URL change monitoring for automatic reconnection
+   * @private
+   */
+  setupUrlChangeMonitoring() {
+    if (!this.page) return;
+    
+    this.navLog('🔍 Setting up URL change monitoring for %s...', this.pageName);
+    
+    // Listen for URL changes (navigation events)
+    this.page.on('framenavigated', async (frame) => {
+      // Only handle main frame navigation
+      if (frame !== this.page.mainFrame()) return;
+      
+      const newUrl = frame.url();
+      const oldUrl = this.currentUrl;
+      
+      // Skip if it's the same URL or initial navigation
+      if (!oldUrl || newUrl === oldUrl) {
+        this.currentUrl = newUrl;
+        return;
+      }
+      
+      this.navLog('🌍 [%s] URL changed: %s → %s', this.pageName, oldUrl, newUrl);
+      this.currentUrl = newUrl;
+      
+      // Skip about:blank navigations (common during testing)
+      if (newUrl === 'about:blank') {
+        this.navLog('⏭️ [%s] Skipping about:blank navigation', this.pageName);
+        return;
+      }
+      
+      // Trigger reconnection
+      await this.handleUrlChange(newUrl, oldUrl);
+    });
+    
+    // Track initial URL
+    this.currentUrl = this.page.url();
+    this.navLog('📍 [%s] Initial URL: %s', this.pageName, this.currentUrl);
+  }
+
+  /**
+   * Handle URL change and attempt reconnection
+   * @param {string} newUrl - New URL
+   * @param {string} oldUrl - Previous URL
+   * @private
+   */
+  async handleUrlChange(newUrl, oldUrl) {
+    if (!this.isAutoReconnectEnabled || !this.connectorPath || !this.loaderFunction) {
+      this.navLog('⚠️ [%s] Auto-reconnect not configured, skipping', this.pageName);
+      return;
+    }
+    
+    try {
+      this.navLog('🔄 [%s] Starting auto-reconnection process...', this.pageName);
+      
+      // Close existing connection if any
+      if (this.connection) {
+        this.navLog('🔌 [%s] Closing existing connection...', this.pageName);
+        this.connection.close();
+        this.connection = null;
+      }
+      
+      // Wait a bit for the new page to load
+      this.navLog('⏳ [%s] Waiting for page to stabilize...', this.pageName);
+      await this.page.waitForTimeout(1000);
+      
+      // Re-setup communication bridge WITHOUT exposing functions again
+      // (functions persist at the context level, we just need to re-inject the page script)
+      this.navLog('🔗 [%s] Re-setting up communication bridge...', this.pageName);
+      await this.setupPostMeCommunication(false); // Don't expose functions again
+      
+      // Re-inject connector on the new page
+      this.navLog('📦 [%s] Re-injecting connector...', this.pageName);
+      await this.loaderFunction(this.page, this.connectorPath);
+      
+      // Re-establish handshake
+      this.navLog('🤝 [%s] Re-establishing handshake...', this.pageName);
+      const messenger = this.createMessenger();
+      const localMethods = this.getLocalMethods();
+      
+      this.connection = await ParentHandshake(
+        messenger,
+        localMethods,
+        10, // maxAttempts
+        1000 // attemptInterval
+      );
+      
+      // Setup event listeners
+      this.connection.remoteHandle().addEventListener('test-event', (data) => {
+        this.commLog('🎊 Received event from reconnected connector: %O', data);
+      });
+      
+      // Emit ready event
+      this.connection.localHandle().emit('playwright-ready', { 
+        message: `Playwright page ${this.pageName} reconnected!`,
+        timestamp: Date.now(),
+        pageName: this.pageName,
+        newUrl,
+        oldUrl
+      });
+      
+      this.navLog('✅ [%s] Auto-reconnection successful!', this.pageName);
+      this.log('🔄 [%s] Successfully reconnected after URL change', this.pageName);
+      
+    } catch (error) {
+      this.navLog('❌ [%s] Auto-reconnection failed: %O', this.pageName, error);
+      console.error(`❌ [${this.pageName}] Auto-reconnection failed:`, error);
+    }
+  }
+
+  /**
+   * Enable or disable automatic reconnection
+   * @param {boolean} enabled - Whether to enable auto-reconnection
+   */
+  setAutoReconnect(enabled) {
+    this.isAutoReconnectEnabled = enabled;
+    this.navLog('🔧 [%s] Auto-reconnect %s', this.pageName, enabled ? 'enabled' : 'disabled');
+  }
+
+  /**
+   * Manually trigger a reconnection (useful for testing)
+   */
+  async manualReconnect() {
+    const currentUrl = this.page ? this.page.url() : null;
+    if (currentUrl) {
+      this.navLog('🔄 [%s] Manual reconnection triggered', this.pageName);
+      await this.handleUrlChange(currentUrl, 'manual-trigger');
+    } else {
+      throw new Error('Page not available for manual reconnection');
+    }
   }
 
   /**
