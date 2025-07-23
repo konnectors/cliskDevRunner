@@ -28,6 +28,9 @@ async function main() {
   const workerPage = new CliskPage(context, 'worker');
   const pilotPage = new CliskPage(context, 'pilot');
   
+  // Setup cross-page communication: pilot can control worker
+  pilotPage.setWorkerReference(workerPage);
+  
   const pages = [workerPage, pilotPage];
   
   try {
@@ -52,8 +55,8 @@ async function main() {
     // Load connector on both pages in parallel (this is safe)
     log('📦 Loading connectors on both pages...');
     const [workerManifest, pilotManifest] = await Promise.all([
-      workerPage.loadConnector(CONNECTOR_PATH, loadConnector),
-      pilotPage.loadConnector(CONNECTOR_PATH, loadConnector)
+      workerPage.loadConnector('examples/goto-konnector', loadConnector),
+      pilotPage.loadConnector('examples/goto-konnector', loadConnector)
     ]);
 
     log('📋 Worker loaded: %s v%s', workerManifest.name, workerManifest.version);
@@ -73,12 +76,20 @@ async function main() {
     log('📄 Worker page: %o', workerConnection ? 'Connected' : 'Failed');
     log('📄 Pilot page: %o', pilotConnection ? 'Connected' : 'Failed');
 
+    // une fois que tout est ready, je veux appeler la fonction ensureAuthenticated sur le pilot
+    await pilotConnection.remoteHandle().call('setContentScriptType', 'pilot');
+    await workerConnection.remoteHandle().call('setContentScriptType', 'worker');
+    await pilotConnection.remoteHandle().call('ensureAuthenticated');
+
     // Keep the browser open for testing
     log('✅ Setup complete! Both pages are open for testing...');
     log('🖥️  You should see two browser tabs: worker and pilot');
     log('🔄 Auto-reconnection is ENABLED on both pages');
-    log('💡 Test it: Navigate to any URL in either tab - the connector will auto-reconnect!');
-    log('📊 Monitor reconnection: DEBUG=clisk:worker:nav,clisk:pilot:nav yarn start');
+    log('🌐 Both pages: Running goto-konnector (with ensureAuthenticated)');
+    log('🎯 Call ensureAuthenticated() on pilot to navigate worker to https://toscrape.com');
+    log('📋 Pilot: call "await connection.remoteHandle().ensureAuthenticated()"');
+    log('🔄 This will resolve only when worker reconnection is complete');
+    log('📊 Monitor activity: DEBUG=clisk:worker:nav,clisk:pilot:main yarn start');
     log('Press Ctrl+C to close');
 
     // Handle graceful shutdown

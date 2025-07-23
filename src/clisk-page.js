@@ -44,6 +44,12 @@ export class CliskPage {
     this.loaderFunction = null;
     this.isAutoReconnectEnabled = false;
     this.currentUrl = null;
+    
+    // Inter-page communication
+    this.workerReference = null;
+    this.reconnectionPromises = new Map(); // Track pending reconnection promises
+    this.onReconnectionComplete = null; // Callback for successful reconnection
+    this.onReconnectionFailure = null; // Callback for failed reconnection
   }
 
   /**
@@ -163,6 +169,15 @@ export class CliskPage {
       
       this.commLog('🎯 Post-me connection fully established!');
       
+      // Automatically set the content script type (required by cozy-clisk connectors)
+      try {
+        const scriptType = this.pageName === 'pilot' ? 'pilot' : 'worker';
+        await this.connection.remoteHandle().call('setContentScriptType', scriptType);
+        this.commLog('🏷️ [%s] Content script type set to: %s', this.pageName, scriptType);
+      } catch (error) {
+        this.commLog('⚠️ [%s] Failed to set content script type: %O', this.pageName, error);
+      }
+      
       return this.connection;
       
     } catch (error) {
@@ -191,14 +206,49 @@ export class CliskPage {
   async close() {
     this.log('🛑 Closing page: %s', this.pageName);
     
-    if (this.connection) {
-      this.connection.close();
-      this.connection = null;
-    }
-    
-    if (this.page) {
-      await this.page.close();
+    try {
+      // Cancel any pending URL change monitoring
+      if (this.urlChangeTimeout) {
+        clearTimeout(this.urlChangeTimeout);
+        this.urlChangeTimeout = null;
+      }
+      
+      // Cleanup any pending reconnection promises
+      if (this.reconnectionPromises) {
+        for (const [id, promise] of this.reconnectionPromises.entries()) {
+          if (promise.reject) {
+            promise.reject(new Error('Page closing'));
+          }
+        }
+        this.reconnectionPromises.clear();
+      }
+      
+      // Cleanup worker reference callbacks
+      if (this.workerReference) {
+        this.workerReference.onReconnectionComplete = null;
+      }
+      
+      // Close post-me connection first
+      if (this.connection) {
+        try {
+          await this.connection.close();
+        } catch (error) {
+          // Ignore close errors
+        }
+        this.connection = null;
+      }
+      
+      // Wait a moment for any pending operations
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Close the page
+      if (this.page && !this.page.isClosed()) {
+        await this.page.close();
+      }
       this.page = null;
+      
+    } catch (error) {
+      this.log('⚠️ Error during close: %O', error);
     }
     
     // Cleanup message handler
@@ -385,6 +435,12 @@ export class CliskPage {
       return;
     }
     
+    // Check if page is still valid
+    if (!this.page || this.page.isClosed()) {
+      this.navLog('⚠️ [%s] Page is closed, skipping auto-reconnection', this.pageName);
+      return;
+    }
+    
     try {
       this.navLog('🔄 [%s] Starting auto-reconnection process...', this.pageName);
       
@@ -393,6 +449,12 @@ export class CliskPage {
         this.navLog('🔌 [%s] Closing existing connection...', this.pageName);
         this.connection.close();
         this.connection = null;
+      }
+      
+      // Check again if page is still valid after closing connection
+      if (!this.page || this.page.isClosed()) {
+        this.navLog('⚠️ [%s] Page was closed during reconnection, aborting', this.pageName);
+        return;
       }
       
       // Wait a bit for the new page to load
@@ -437,9 +499,19 @@ export class CliskPage {
       this.navLog('✅ [%s] Auto-reconnection successful!', this.pageName);
       this.log('🔄 [%s] Successfully reconnected after URL change', this.pageName);
       
+      // Signal reconnection completion for any waiting promises
+      if (this.onReconnectionComplete) {
+        this.onReconnectionComplete(newUrl);
+      }
+      
     } catch (error) {
       this.navLog('❌ [%s] Auto-reconnection failed: %O', this.pageName, error);
       console.error(`❌ [${this.pageName}] Auto-reconnection failed:`, error);
+      
+      // Signal reconnection failure for any waiting promises
+      if (this.onReconnectionFailure) {
+        this.onReconnectionFailure(newUrl, error);
+      }
     }
   }
 
@@ -502,7 +574,7 @@ export class CliskPage {
    * @private
    */
   getLocalMethods() {
-    return {
+    const baseMethods = {
       // Method that connector can call
       ping: () => {
         this.commLog('🏓 [%s] Ping received from connector!', this.pageName);
@@ -533,7 +605,119 @@ export class CliskPage {
           echo: data,
           pageName: this.pageName
         };
+      },
+
+      // Method to set content script type (required by cozy-clisk connectors)
+      setContentScriptType: (contentScriptType) => {
+        this.commLog('🏷️ [%s] setContentScriptType called with: %s', this.pageName, contentScriptType);
+        // Store the content script type
+        this.contentScriptType = contentScriptType;
+        return true;
       }
     };
+
+    // Add pilot-specific methods
+    if (this.pageName === 'pilot') {
+      baseMethods.setWorkerState = async (state) => {
+        this.commLog('🎯 [%s] setWorkerState called with: %O', this.pageName, state);
+        return await this.setWorkerState(state);
+      };
+    }
+
+    return baseMethods;
+  }
+
+  /**
+   * Set worker reference for pilot page (enables cross-page communication)
+   * @param {CliskPage} workerPage - Reference to the worker page
+   */
+  setWorkerReference(workerPage) {
+    if (this.pageName === 'pilot') {
+      this.workerReference = workerPage;
+      this.log('🔗 [%s] Worker reference set for cross-page communication', this.pageName);
+    } else {
+      throw new Error('setWorkerReference can only be called on pilot pages');
+    }
+  }
+
+  /**
+   * Set worker state (URL) and wait for reconnection - only available for pilot
+   * @param {Object} state - State object containing url
+   * @returns {Promise} Promise that resolves when worker reconnection is complete
+   */
+  async setWorkerState(state) {
+    if (this.pageName !== 'pilot') {
+      throw new Error('setWorkerState can only be called from pilot pages');
+    }
+    
+    if (!this.workerReference) {
+      throw new Error('Worker reference not set. Call setWorkerReference first.');
+    }
+    
+    const { url } = state;
+    if (!url) {
+      throw new Error('setWorkerState requires a url in the state object');
+    }
+    
+    this.log('🎯 [%s] Setting worker URL to: %s', this.pageName, url);
+    
+    // Create a promise that will resolve when worker reconnection is complete
+    const reconnectionId = Date.now().toString();
+    
+    const reconnectionPromise = new Promise((resolve, reject) => {
+      // Set a timeout to avoid hanging forever
+      const timeout = setTimeout(() => {
+        this.reconnectionPromises.delete(reconnectionId);
+        reject(new Error(`Worker reconnection timeout after navigating to ${url}`));
+      }, 30000); // 30 second timeout
+      
+      // Store the resolve function to be called when reconnection completes
+      this.reconnectionPromises.set(reconnectionId, {
+        resolve: (result) => {
+          clearTimeout(timeout);
+          this.reconnectionPromises.delete(reconnectionId);
+          resolve(result);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          this.reconnectionPromises.delete(reconnectionId);
+          reject(error);
+        },
+        url,
+        startTime: Date.now()
+      });
+    });
+    
+    // Setup a one-time listener for worker reconnection
+    this.workerReference.onReconnectionComplete = (reconnectedUrl) => {
+      // Find and resolve any pending promises for this URL
+      for (const [id, promise] of this.reconnectionPromises.entries()) {
+        if (promise.url === reconnectedUrl) {
+          this.log('✅ [%s] Worker reconnection complete for URL: %s (took %dms)', 
+            this.pageName, reconnectedUrl, Date.now() - promise.startTime);
+          promise.resolve({ 
+            success: true, 
+            url: reconnectedUrl, 
+            duration: Date.now() - promise.startTime 
+          });
+        }
+      }
+    };
+    
+    // Navigate worker to new URL (this will trigger auto-reconnection)
+    try {
+      await this.workerReference.navigate(url);
+      this.log('🌐 [%s] Worker navigation initiated to: %s', this.pageName, url);
+    } catch (error) {
+      // If navigation fails, reject all pending promises
+      const promise = this.reconnectionPromises.get(reconnectionId);
+      if (promise) {
+        promise.reject(new Error(`Worker navigation failed: ${error.message}`));
+      }
+      throw error;
+    }
+    
+    // Return the promise that will resolve when reconnection is complete
+    return reconnectionPromise;
   }
 } 
