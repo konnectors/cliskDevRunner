@@ -1,14 +1,17 @@
 import { chromium } from 'playwright';
+import debug from 'debug';
 import { setupConsoleLogging } from './console-logger.js';
 import { loadConnector } from './connector-loader.js';
 import { setupPostMeCommunication, initiateHandshake } from './communication.js';
+
+const log = debug('handshake:main');
 
 // Configuration
 const CONNECTOR_PATH = process.argv[2] || 'examples/handshake-konnector';
 
 async function main() {
-  console.log('🚀 Starting HandshakeTester...');
-  console.log(`📁 Using connector: ${CONNECTOR_PATH}`);
+  log('🚀 Starting HandshakeTester...');
+  log(`📁 Using connector: ${CONNECTOR_PATH}`);
 
   // Launch browser
   const browser = await chromium.launch({ 
@@ -40,12 +43,12 @@ async function main() {
   const connection = await initiateHandshake(page);
 
   // Keep the browser open for testing
-  console.log('✅ Setup complete! Browser will stay open for testing...');
-  console.log('Press Ctrl+C to close');
+  log('✅ Setup complete! Browser will stay open for testing...');
+  log('Press Ctrl+C to close');
 
   // Handle graceful shutdown
   process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down...');
+    log('\n🛑 Shutting down...');
     
     // Cleanup connection if it exists
     if (connection) {

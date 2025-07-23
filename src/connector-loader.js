@@ -6,6 +6,9 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import debug from 'debug';
+
+const log = debug('handshake:loader');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +19,7 @@ const __dirname = path.dirname(__filename);
  * @param {string} connectorPath - Path to the connector directory
  */
 export async function loadConnector(page, connectorPath) {
-  console.log(`📦 Loading connector from ${connectorPath}...`);
+  log(`📦 Loading connector from ${connectorPath}...`);
   
   try {
     // Read connector main.js file - go up one level since we're now in src/
@@ -27,14 +30,14 @@ export async function loadConnector(page, connectorPath) {
     const manifestPath = path.join(__dirname, '..', connectorPath, 'manifest.konnector');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
     
-    console.log(`📋 Connector: ${manifest.name} v${manifest.version}`);
+    log(`📋 Connector: ${manifest.name} v${manifest.version}`);
     
     // Inject connector code
     await page.addScriptTag({
       content: connectorCode
     });
     
-    console.log('✅ Connector code injected successfully');
+    log('✅ Connector code injected successfully');
     
     return manifest;
     

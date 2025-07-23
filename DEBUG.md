@@ -1,0 +1,51 @@
+# Guide Debug
+
+Le projet utilise la librairie [debug](https://github.com/debug-js/debug) pour un système de logging filtrable.
+
+## Namespaces disponibles
+
+- `handshake:main` - Messages du fichier principal
+- `handshake:console` - Logs du module console-logger  
+- `handshake:page` - Messages provenant de la page web
+- `handshake:loader` - Logs du module connector-loader
+- `handshake:comm` - Messages généraux de communication
+- `handshake:playwright` - Logs spécifiques à Playwright
+- `handshake:message` - Messages post-me échangés
+
+## Utilisation
+
+### Activer tous les logs
+```bash
+DEBUG=handshake:* yarn start examples/handshake-konnector
+```
+
+### Activer seulement les logs principaux
+```bash
+DEBUG=handshake:main,handshake:comm yarn start examples/handshake-konnector
+```
+
+### Activer seulement les messages post-me
+```bash
+DEBUG=handshake:message yarn start examples/handshake-konnector
+```
+
+### Activer les logs de la page web
+```bash
+DEBUG=handshake:page yarn start examples/handshake-konnector
+```
+
+### Désactiver tous les logs debug (mode silencieux)
+```bash
+yarn start examples/handshake-konnector
+```
+
+## Exemples de patterns
+
+- `DEBUG=handshake:*` - Tous les logs du projet
+- `DEBUG=handshake:main,handshake:loader` - Seulement main et loader
+- `DEBUG=handshake:playwright,handshake:message` - Communication Playwright
+- `DEBUG=*` - Tous les logs (inclut les dépendances)
+
+## Logs d'erreur
+
+Les erreurs importantes restent affichées via `console.error` même sans DEBUG activé. 

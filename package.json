@@ -8,14 +8,20 @@
     "start": "node src/index.js",
     "test": "node src/index.js"
   },
-  "keywords": ["playwright", "post-me", "connector", "handshake"],
+  "keywords": [
+    "playwright",
+    "post-me",
+    "connector",
+    "handshake"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "debug": "^4.4.1",
     "playwright": "^1.40.0",
     "post-me": "^0.4.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0"
   }
-} 
+}

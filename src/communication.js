@@ -4,13 +4,18 @@
  */
 
 import { ParentHandshake } from 'post-me';
+import debug from 'debug';
+
+const log = debug('handshake:comm');
+const playwrightLog = debug('handshake:playwright');
+const messageLog = debug('handshake:message');
 
 /**
  * Setup ReactNativeWebView.postMessage simulation and post-me communication bridge
  * @param {Page} page - Playwright page instance
  */
 export async function setupPostMeCommunication(page) {
-  console.log('🔗 Setting up post-me communication bridge...');
+  log('🔗 Setting up post-me communication bridge...');
   
   // Initialize global handler
   global.playwrightMessageHandler = null;
@@ -67,7 +72,7 @@ export async function setupPostMeCommunication(page) {
 function createPlaywrightMessenger(page) {
   return {
     postMessage: async (message, transfer) => {
-      console.log('➡️ [Playwright→Page] Sending message:', message);
+      messageLog('➡️ [Playwright→Page] Sending message: %O', message);
       
       // Send message to the page via window.postMessage
       await page.evaluate((msg) => {
@@ -76,17 +81,17 @@ function createPlaywrightMessenger(page) {
     },
     
     addMessageListener: (listener) => {
-      console.log('👂 [Playwright] Setting up message listener...');
+      playwrightLog('👂 Setting up message listener...');
       
       // Store the listener globally so the exposed function can access it
       global.playwrightMessageHandler = (data) => {
-        console.log('📨 [Page→Playwright] Message received:', data);
+        messageLog('📨 [Page→Playwright] Message received: %O', data);
         listener({ data });
       };
       
       // Return cleanup function
       return () => {
-        console.log('🧹 [Playwright] Cleaning up message listener');
+        playwrightLog('🧹 Cleaning up message listener');
         global.playwrightMessageHandler = null;
       };
     }
@@ -101,18 +106,18 @@ function getLocalMethods() {
   return {
     // Method that connector can call
     ping: () => {
-      console.log('🏓 [Playwright] Ping received from connector!');
+      playwrightLog('🏓 Ping received from connector!');
       return 'pong';
     },
     
     // Method to log messages
     log: (message) => {
-      console.log('📝 [Connector→Playwright]', message);
+      playwrightLog('📝 [Connector→Playwright] %s', message);
     },
     
     // Method to simulate a response
     simulateResponse: (data) => {
-      console.log('🎭 [Playwright] Simulating response for:', data);
+      playwrightLog('🎭 Simulating response for: %O', data);
       return { success: true, timestamp: Date.now(), echo: data };
     }
   };
@@ -134,18 +139,18 @@ export async function initiateHandshake(page, options = {}) {
     waitTime = 3000
   } = options;
 
-  console.log('🤝 Initiating post-me handshake...');
+  log('🤝 Initiating post-me handshake...');
   
   const messenger = createPlaywrightMessenger(page);
   const localMethods = getLocalMethods();
 
   try {
     // Wait a bit for the connector to be ready
-    console.log('⏳ Waiting for connector to initialize...');
+    log('⏳ Waiting for connector to initialize...');
     await page.waitForTimeout(waitTime);
     
     // Initiate handshake from parent side (Playwright)
-    console.log('🚀 [Playwright] Initiating ParentHandshake...');
+    playwrightLog('🚀 Initiating ParentHandshake...');
     
     const connection = await ParentHandshake(
       messenger,
@@ -154,22 +159,22 @@ export async function initiateHandshake(page, options = {}) {
       attemptInterval
     );
     
-    console.log('✅ [Playwright] Post-me handshake successful!');
+    playwrightLog('✅ Post-me handshake successful!');
     
     // Test the connection
     try {
-      console.log('🧪 [Playwright] Testing connection...');
+      playwrightLog('🧪 Testing connection...');
       
       // Try to call a method on the remote (connector) side if available
       // Note: the handshake connector might not expose methods, so this is just a test
       
     } catch (error) {
-      console.log('⚠️ [Playwright] Remote call test failed (this might be normal):', error.message);
+      playwrightLog('⚠️ Remote call test failed (this might be normal): %s', error.message);
     }
     
     // Listen for events from the connector
     connection.remoteHandle().addEventListener('test-event', (data) => {
-      console.log('🎊 [Playwright] Received event from connector:', data);
+      playwrightLog('🎊 Received event from connector: %O', data);
     });
     
     // Emit a test event to the connector
@@ -178,7 +183,7 @@ export async function initiateHandshake(page, options = {}) {
       timestamp: Date.now()
     });
     
-    console.log('🎯 [Playwright] Post-me connection is fully established and ready!');
+    log('🎯 Post-me connection is fully established and ready!');
     
     // Store connection globally for potential future use
     global.postMeConnection = connection;
@@ -186,7 +191,7 @@ export async function initiateHandshake(page, options = {}) {
     return connection;
     
   } catch (error) {
-    console.error('❌ [Playwright] Post-me handshake failed:', error);
+    console.error('❌ Post-me handshake failed:', error);
     console.error('Stack trace:', error.stack);
     throw error;
   }
