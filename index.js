@@ -2,12 +2,13 @@ import { chromium } from 'playwright';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { ParentHandshake, debug as postMeDebug } from 'post-me';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration
-const CONNECTOR_PATH = process.argv[2] || 'examples/minimal-konnector';
+const CONNECTOR_PATH = process.argv[2] || 'examples/handshake-konnector';
 
 async function main() {
   console.log('🚀 Starting HandshakeTester...');
@@ -27,17 +28,24 @@ async function main() {
 
   const page = await context.newPage();
 
-  // Setup ReactNativeWebView.postMessage simulation
-  await setupReactNativeWebView(page);
-  
-  // Setup post-me messenger for playwright
-  await setupPostMeMessenger(page);
+  // Setup console logging from page
+  page.on('console', msg => {
+    const type = msg.type();
+    const text = msg.text();
+    console.log(`📄 [Console ${type}]`, text);
+  });
 
+  // Setup ReactNativeWebView.postMessage simulation and post-me communication
+  await setupPostMeCommunication(page);
+  
   // Navigate to about:blank
   await page.goto('about:blank');
 
   // Load and inject connector code
   await loadConnector(page, CONNECTOR_PATH);
+
+  // Initiate the handshake after connector is loaded
+  await initiateHandshake(page);
 
   // Keep the browser open for testing
   console.log('✅ Setup complete! Browser will stay open for testing...');
@@ -52,97 +60,159 @@ async function main() {
 }
 
 /**
- * Setup ReactNativeWebView.postMessage simulation
+ * Setup ReactNativeWebView.postMessage simulation and post-me communication bridge
  */
-async function setupReactNativeWebView(page) {
-  console.log('📱 Setting up ReactNativeWebView.postMessage...');
+async function setupPostMeCommunication(page) {
+  console.log('🔗 Setting up post-me communication bridge...');
+  
+  // Initialize global handler
+  global.playwrightMessageHandler = null;
+  
+  // Expose function to receive messages from the page
+  await page.exposeFunction('sendToPlaywright', (data) => {
+    // This will be handled by the messenger later
+    if (global.playwrightMessageHandler) {
+      global.playwrightMessageHandler(data);
+    }
+  });
   
   await page.addInitScript(() => {
     // Create ReactNativeWebView object if it doesn't exist
     window.ReactNativeWebView = window.ReactNativeWebView || {};
     
-    // Setup postMessage function
+    // Setup postMessage function that bridges to the host
     window.ReactNativeWebView.postMessage = (message) => {
-      console.log('📤 [ReactNativeWebView] Received message:', message);
+      console.log('📤 [ReactNativeWebView] Posting message:', message);
       
       // Parse message if it's a string
       let parsedMessage;
       try {
         parsedMessage = typeof message === 'string' ? JSON.parse(message) : message;
       } catch (e) {
+        console.error('❌ [ReactNativeWebView] Failed to parse message:', e);
         parsedMessage = { raw: message };
       }
       
-      // Dispatch custom event that can be listened to
-      window.dispatchEvent(new CustomEvent('reactnative-message', { 
-        detail: parsedMessage 
-      }));
+      // Dispatch as window message for post-me compatibility
+      window.postMessage(parsedMessage, '*'); // Use '*' instead of window.location.origin for about:blank
     };
     
-    console.log('✅ ReactNativeWebView.postMessage is ready');
-  });
-}
-
-/**
- * Setup post-me messenger for playwright
- */
-async function setupPostMeMessenger(page) {
-  console.log('🔗 Setting up post-me messenger...');
-  
-  // Listen for messages from the page
-  page.on('console', msg => {
-    if (msg.type() === 'log' && msg.text().includes('[post-me]')) {
-      console.log('🔔 [post-me]', msg.text());
-    }
-  });
-
-  // Listen for ReactNative messages
-  await page.exposeFunction('handleReactNativeMessage', (message) => {
-    console.log('📥 [Host] Received from ReactNativeWebView:', message);
-    
-    // Handle post-me handshake messages
-    if (message.type === '@post-me') {
-      handlePostMeMessage(page, message);
-    }
-  });
-
-  // Setup message listener in the page
-  await page.addInitScript(() => {
-    window.addEventListener('reactnative-message', (event) => {
-      window.handleReactNativeMessage(event.detail);
-    });
-  });
-}
-
-/**
- * Handle post-me protocol messages
- */
-async function handlePostMeMessage(page, message) {
-  console.log('🤝 [post-me] Handling message:', message.action);
-  
-  if (message.action === 'handshake-request') {
-    // Respond to handshake request
-    const response = {
-      type: '@post-me',
-      action: 'handshake-response',
-      source: 'PlaywrightHost',
-      timestamp: Date.now(),
-      payload: {
-        accepted: true,
-        methods: message.payload?.methods || [],
-        connectionId: Math.random().toString(36).substr(2, 9)
+    // Setup message forwarding for post-me messages
+    window.addEventListener('message', (event) => {
+      // Only forward post-me messages to Playwright
+      if (event.data && event.data.type === '@post-me') {
+        console.log('🔄 [Page] Forwarding post-me message to Playwright:', event.data);
+        if (window.sendToPlaywright) {
+          window.sendToPlaywright(event.data);
+        }
       }
-    };
+    });
     
-    console.log('✅ [post-me] Sending handshake response');
+    console.log('✅ ReactNativeWebView.postMessage and post-me bridge ready');
+  });
+}
+
+/**
+ * Initiate post-me handshake using ParentHandshake
+ */
+async function initiateHandshake(page) {
+  console.log('🤝 Initiating post-me handshake...');
+  
+  // Create a custom messenger that bridges Playwright with the page
+  const messenger = {
+    postMessage: async (message, transfer) => {
+      console.log('➡️ [Playwright→Page] Sending message:', message);
+      
+      // Send message to the page via window.postMessage
+      await page.evaluate((msg) => {
+        window.postMessage(msg, '*'); // Use '*' instead of window.location.origin since we're on about:blank
+      }, message);
+    },
     
-    // Send response back to the page
-    await page.evaluate((response) => {
-      window.dispatchEvent(new MessageEvent('message', {
-        data: response,
-        origin: window.location.origin
-      }));
-    }, response);
+    addMessageListener: (listener) => {
+      console.log('👂 [Playwright] Setting up message listener...');
+      
+      // Store the listener globally so the exposed function can access it
+      global.playwrightMessageHandler = (data) => {
+        console.log('📨 [Page→Playwright] Message received:', data);
+        listener({ data });
+      };
+      
+      // Return cleanup function
+      return () => {
+        console.log('🧹 [Playwright] Cleaning up message listener');
+        global.playwrightMessageHandler = null;
+      };
+    }
+  };
+
+  // Setup local methods that can be called by the connector
+  const localMethods = {
+    // Method that connector can call
+    ping: () => {
+      console.log('🏓 [Playwright] Ping received from connector!');
+      return 'pong';
+    },
+    
+    // Method to log messages
+    log: (message) => {
+      console.log('📝 [Connector→Playwright]', message);
+    },
+    
+    // Method to simulate a response
+    simulateResponse: (data) => {
+      console.log('🎭 [Playwright] Simulating response for:', data);
+      return { success: true, timestamp: Date.now(), echo: data };
+    }
+  };
+
+  try {
+    // Wait a bit for the connector to be ready
+    console.log('⏳ Waiting for connector to initialize...');
+    await page.waitForTimeout(3000);
+    
+    // Initiate handshake from parent side (Playwright)
+    console.log('🚀 [Playwright] Initiating ParentHandshake...');
+    
+    const connection = await ParentHandshake(
+      messenger,
+      localMethods,
+      10, // max attempts
+      1000 // attempt interval in ms
+    );
+    
+    console.log('✅ [Playwright] Post-me handshake successful!');
+    
+    // Test the connection
+    try {
+      console.log('🧪 [Playwright] Testing connection...');
+      
+      // Try to call a method on the remote (connector) side if available
+      // Note: the handshake connector might not expose methods, so this is just a test
+      
+    } catch (error) {
+      console.log('⚠️ [Playwright] Remote call test failed (this might be normal):', error.message);
+    }
+    
+    // Listen for events from the connector
+    connection.remoteHandle().addEventListener('test-event', (data) => {
+      console.log('🎊 [Playwright] Received event from connector:', data);
+    });
+    
+    // Emit a test event to the connector
+    connection.localHandle().emit('playwright-ready', { 
+      message: 'Playwright is ready to communicate!',
+      timestamp: Date.now()
+    });
+    
+    console.log('🎯 [Playwright] Post-me connection is fully established and ready!');
+    
+    // Store connection globally for potential future use
+    global.postMeConnection = connection;
+    
+  } catch (error) {
+    console.error('❌ [Playwright] Post-me handshake failed:', error);
+    console.error('Stack trace:', error.stack);
   }
 }
 
