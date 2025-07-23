@@ -22,6 +22,26 @@ yarn start examples/sample-konnector
 yarn start examples/handshake-konnector
 ```
 
+## Niveaux de Logs
+
+Le projet supporte différents niveaux de logs pour contrôler la verbosité :
+
+```bash
+# Logs extrêmes (tout voir)
+npm run start:extreme
+
+# Logs complets (flux principal)
+npm run start:full
+
+# Logs normaux (essentiels)
+npm run start:normal
+
+# Logs silencieux (minimal)
+npm run start:quiet
+```
+
+**📖 Voir [LOG_LEVELS.md](LOG_LEVELS.md) pour plus de détails sur les niveaux de logs.**
+
 ## Fonctionnement
 
 1. Lance Playwright avec Chromium
@@ -35,12 +55,13 @@ yarn start examples/handshake-konnector
 ## Structure
 
 - `index.js` - Fichier principal
+- `log-config.js` - Configuration des niveaux de logs
 - `examples/` - Connecteurs de test existants
 - `package.json` - Configuration des dépendances
 
 ## Debug
 
-Les messages de communication sont affichés dans la console :
+Les messages de communication sont affichés dans la console selon le niveau de log configuré :
 - 📤 Messages sortants du connecteur
 - 📥 Messages entrants vers l'host
 - 🤝 Messages post-me handshake

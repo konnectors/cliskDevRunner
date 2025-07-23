@@ -4,7 +4,7 @@
  */
 
 import { ParentHandshake } from 'post-me';
-import debug from 'debug';
+import { createPageLoggers } from './log-config.js';
 
 /**
  * CliskPage class - manages a single page with isolated communication and logging
@@ -25,12 +25,13 @@ export class CliskPage {
       ...options
     };
     
-    // Create debug loggers for this page
-    this.log = debug(`clisk:${pageName}:main`);
-    this.pageLog = debug(`clisk:${pageName}:page`);
-    this.messageLog = debug(`clisk:${pageName}:message`);
-    this.commLog = debug(`clisk:${pageName}:comm`);
-    this.navLog = debug(`clisk:${pageName}:nav`);
+    // Create debug loggers for this page using the centralized system
+    const loggers = createPageLoggers(pageName);
+    this.log = loggers.main;
+    this.pageLog = loggers.page;
+    this.messageLog = loggers.message;
+    this.commLog = loggers.comm;
+    this.navLog = loggers.nav;
     
     // Instance variables for isolated state
     this.page = null;

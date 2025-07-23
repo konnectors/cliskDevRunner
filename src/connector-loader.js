@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import debug from 'debug';
 
-const log = debug('handshake:loader');
+const log = debug('clisk:handshake:loader');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
