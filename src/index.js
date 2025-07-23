@@ -9,7 +9,7 @@ const log = debug('handshake:main');
 const CONNECTOR_PATH = process.argv[2] || 'examples/handshake-konnector';
 
 async function main() {
-  log('🚀 Starting HandshakeTester...');
+  log('🚀 Starting HandshakeTester with multi-pages...');
   log(`📁 Using connector: ${CONNECTOR_PATH}`);
 
   // Launch browser
@@ -24,32 +24,69 @@ async function main() {
     viewport: { width: 375, height: 667 }
   });
 
-  // Create a CliskPage instance
-  const mainPage = new CliskPage(context, 'main');
+  // Create two CliskPage instances
+  const workerPage = new CliskPage(context, 'worker');
+  const pilotPage = new CliskPage(context, 'pilot');
+  
+  const pages = [workerPage, pilotPage];
   
   try {
-    // Initialize the page
-    await mainPage.init();
+    // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
+    // ⚠️ CRITICAL: Page.exposeFunction() cannot be called in parallel on multiple pages!
+    // This causes function exposure failures on subsequent pages.
+    log('📄 Initializing pages sequentially to avoid function exposure conflicts...');
+    
+    await workerPage.init();
+    log('✅ Worker page initialized');
+    
+    await pilotPage.init();
+    log('✅ Pilot page initialized');
 
-    // Navigate to about:blank
-    await mainPage.navigate('about:blank');
+    // Navigate both pages in parallel (this is safe)
+    log('🌐 Navigating both pages...');
+    await Promise.all([
+      workerPage.navigate('about:blank'),
+      pilotPage.navigate('about:blank')
+    ]);
 
-    // Load and inject connector code
-    const manifest = await mainPage.loadConnector(CONNECTOR_PATH, loadConnector);
+    // Load connector on both pages in parallel (this is safe)
+    log('📦 Loading connectors on both pages...');
+    const [workerManifest, pilotManifest] = await Promise.all([
+      workerPage.loadConnector(CONNECTOR_PATH, loadConnector),
+      pilotPage.loadConnector(CONNECTOR_PATH, loadConnector)
+    ]);
 
-    // Initiate the handshake
-    const connection = await mainPage.initiateHandshake();
+    log('📋 Worker loaded: %s v%s', workerManifest.name, workerManifest.version);
+    log('📋 Pilot loaded: %s v%s', pilotManifest.name, pilotManifest.version);
+
+    // Initiate handshakes in PARALLEL (safe now that functions are properly exposed)
+    // ✅ Since page initialization (including exposeFunction) is done sequentially,
+    // both pages now have their functions available, so handshakes can run in parallel
+    log('🤝 Starting handshakes in parallel...');
+    const [workerConnection, pilotConnection] = await Promise.all([
+      workerPage.initiateHandshake(),
+      pilotPage.initiateHandshake()
+    ]);
+    log('✅ Both handshakes completed simultaneously');
+
+    log('✅ Both pages are ready!');
+    log('📄 Worker page: %o', workerConnection ? 'Connected' : 'Failed');
+    log('📄 Pilot page: %o', pilotConnection ? 'Connected' : 'Failed');
 
     // Keep the browser open for testing
-    log('✅ Setup complete! Browser will stay open for testing...');
+    log('✅ Setup complete! Both pages are open for testing...');
+    log('🖥️  You should see two browser tabs: worker and pilot');
     log('Press Ctrl+C to close');
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
-      log('\n🛑 Shutting down...');
+      log('\n🛑 Shutting down both pages...');
       
-      // Cleanup page
-      await mainPage.close();
+      // Cleanup both pages
+      await Promise.all([
+        workerPage.close(),
+        pilotPage.close()
+      ]);
       
       await browser.close();
       process.exit(0);
@@ -57,7 +94,9 @@ async function main() {
     
   } catch (error) {
     console.error('❌ Setup failed:', error);
-    await mainPage.close();
+    
+    // Cleanup all pages
+    await Promise.all(pages.map(page => page.close()));
     await browser.close();
     process.exit(1);
   }

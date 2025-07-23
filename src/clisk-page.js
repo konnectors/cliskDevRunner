@@ -206,18 +206,14 @@ export class CliskPage {
   async setupPostMeCommunication() {
     this.commLog('🔗 Setting up post-me communication bridge...');
     
-    // Create unique function names for this page to avoid conflicts
-    const sendToPlaywrightFn = `sendToPlaywright_${this.pageName}`;
-    const sendPageLogFn = `sendPageLog_${this.pageName}`;
-    
-    // Expose functions with unique names
-    await this.page.exposeFunction(sendToPlaywrightFn, (data) => {
+    // Expose functions directly on this page
+    await this.page.exposeFunction('sendToPlaywright', (data) => {
       if (this.messageHandler) {
         this.messageHandler(data);
       }
     });
     
-    await this.page.exposeFunction(sendPageLogFn, (level, ...args) => {
+    await this.page.exposeFunction('sendPageLog', (level, ...args) => {
       if (level === 'error') {
         console.error(`[${this.pageName} Page Error]`, ...args);
       } else {
@@ -232,16 +228,21 @@ export class CliskPage {
       // Create page-specific logger
       const pageLogger = {
         log: function(...args) {
-          if (window.${sendPageLogFn}) {
-            window.${sendPageLogFn}('log', ...args);
+          if (window.sendPageLog) {
+            window.sendPageLog('log', ...args);
           }
         },
         error: function(...args) {
-          if (window.${sendPageLogFn}) {
-            window.${sendPageLogFn}('error', ...args);
+          if (window.sendPageLog) {
+            window.sendPageLog('error', ...args);
           }
         }
       };
+      
+      // Test if global functions are available
+      console.log('[DEBUG] Checking functions for ${this.pageName}');
+      console.log('[DEBUG] sendToPlaywright available:', typeof window.sendToPlaywright);
+      console.log('[DEBUG] sendPageLog available:', typeof window.sendPageLog);
       
       // Create ReactNativeWebView object if it doesn't exist
       window.ReactNativeWebView = window.ReactNativeWebView || {};
@@ -262,10 +263,10 @@ export class CliskPage {
         // Forward post-me messages to Playwright
         if (parsedMessage.type === '@post-me') {
           pageLogger.log('🔄 [${this.pageName}→Playwright] Forwarding:', parsedMessage);
-          if (window.${sendToPlaywrightFn}) {
-            window.${sendToPlaywrightFn}(parsedMessage);
+          if (window.sendToPlaywright) {
+            window.sendToPlaywright(parsedMessage);
           } else {
-            pageLogger.error('❌ [${this.pageName}] Function ${sendToPlaywrightFn} not found!');
+            pageLogger.error('❌ [${this.pageName}] sendToPlaywright function not found!');
           }
         } else {
           // Dispatch as window message for non-post-me messages
@@ -281,7 +282,6 @@ export class CliskPage {
       });
       
       pageLogger.log('✅ [${this.pageName}] ReactNativeWebView and post-me bridge ready');
-      pageLogger.log('🔧 [${this.pageName}] Using functions: ${sendToPlaywrightFn}, ${sendPageLogFn}');
       console.log('[DEBUG] Init script completed for ${this.pageName}');
     `;
     
