@@ -9,6 +9,7 @@ import debug from 'debug';
 const log = debug('handshake:comm');
 const playwrightLog = debug('handshake:playwright');
 const messageLog = debug('handshake:message');
+const pageLog = debug('handshake:page');
 
 /**
  * Setup ReactNativeWebView.postMessage simulation and post-me communication bridge
@@ -28,39 +29,70 @@ export async function setupPostMeCommunication(page) {
     }
   });
   
+  // Expose function to receive debug logs from the page
+  await page.exposeFunction('sendPageLog', (level, ...args) => {
+    if (level === 'error') {
+      console.error('[Page Error]', ...args);
+    } else {
+      pageLog(`[${level}] %o`, args);
+    }
+  });
+  
   await page.addInitScript(() => {
+    // Create a simple logger for the page context
+    const pageLogger = {
+      log: (...args) => {
+        if (window.sendPageLog) {
+          window.sendPageLog('log', ...args);
+        }
+      },
+      error: (...args) => {
+        if (window.sendPageLog) {
+          window.sendPageLog('error', ...args);
+        }
+      }
+    };
+    
     // Create ReactNativeWebView object if it doesn't exist
     window.ReactNativeWebView = window.ReactNativeWebView || {};
     
     // Setup postMessage function that bridges to the host
     window.ReactNativeWebView.postMessage = (message) => {
-      console.log('📤 [ReactNativeWebView] Posting message:', message);
+      pageLogger.log('📤 [ReactNativeWebView] Posting message:', message);
       
       // Parse message if it's a string
       let parsedMessage;
       try {
         parsedMessage = typeof message === 'string' ? JSON.parse(message) : message;
       } catch (e) {
-        console.error('❌ [ReactNativeWebView] Failed to parse message:', e);
+        pageLogger.error('❌ [ReactNativeWebView] Failed to parse message:', e);
         parsedMessage = { raw: message };
       }
       
-      // Dispatch as window message for post-me compatibility
-      window.postMessage(parsedMessage, '*'); // Use '*' instead of window.location.origin for about:blank
+      // For ReactNativeWebView messages, forward directly to Playwright
+      // These are messages FROM the connector TO Playwright
+      if (parsedMessage.type === '@post-me') {
+        pageLogger.log('🔄 [ReactNativeWebView→Playwright] Forwarding message:', parsedMessage);
+        if (window.sendToPlaywright) {
+          window.sendToPlaywright(parsedMessage);
+        }
+      } else {
+        // Dispatch as window message for post-me compatibility for non-post-me messages
+        window.postMessage(parsedMessage, '*');
+      }
     };
     
-    // Setup message forwarding for post-me messages
+    // Setup message listener for messages FROM Playwright TO the connector
+    // These should NOT be forwarded back to Playwright
     window.addEventListener('message', (event) => {
-      // Only forward post-me messages to Playwright
+      // Only log, don't forward back - these are responses from Playwright
       if (event.data && event.data.type === '@post-me') {
-        console.log('🔄 [Page] Forwarding post-me message to Playwright:', event.data);
-        if (window.sendToPlaywright) {
-          window.sendToPlaywright(event.data);
-        }
+        pageLogger.log('📥 [Playwright→Page] Received message:', event.data);
+        // Don't forward these back to Playwright - they're already from Playwright!
       }
     });
     
-    console.log('✅ ReactNativeWebView.postMessage and post-me bridge ready');
+    pageLogger.log('✅ ReactNativeWebView.postMessage and post-me bridge ready');
   });
 }
 
@@ -191,6 +223,7 @@ export async function initiateHandshake(page, options = {}) {
     return connection;
     
   } catch (error) {
+    // Keep console.error for critical errors
     console.error('❌ Post-me handshake failed:', error);
     console.error('Stack trace:', error.stack);
     throw error;

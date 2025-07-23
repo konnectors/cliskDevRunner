@@ -42,7 +42,7 @@ export async function loadConnector(page, connectorPath) {
     return manifest;
     
   } catch (error) {
-    console.error('❌ Error loading connector:', error.message);
+    log('❌ Error loading connector: %s', error.message);
     throw error;
   }
 } 

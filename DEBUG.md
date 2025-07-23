@@ -6,7 +6,7 @@ Le projet utilise la librairie [debug](https://github.com/debug-js/debug) pour u
 
 - `handshake:main` - Messages du fichier principal
 - `handshake:console` - Logs du module console-logger  
-- `handshake:page` - Messages provenant de la page web
+- `handshake:page` - Messages provenant de la page web (remplace les console.log de la page)
 - `handshake:loader` - Logs du module connector-loader
 - `handshake:comm` - Messages généraux de communication
 - `handshake:playwright` - Logs spécifiques à Playwright
@@ -34,6 +34,11 @@ DEBUG=handshake:message yarn start examples/handshake-konnector
 DEBUG=handshake:page yarn start examples/handshake-konnector
 ```
 
+### Activer la communication Playwright
+```bash
+DEBUG=handshake:playwright,handshake:message yarn start examples/handshake-konnector
+```
+
 ### Désactiver tous les logs debug (mode silencieux)
 ```bash
 yarn start examples/handshake-konnector
@@ -44,8 +49,15 @@ yarn start examples/handshake-konnector
 - `DEBUG=handshake:*` - Tous les logs du projet
 - `DEBUG=handshake:main,handshake:loader` - Seulement main et loader
 - `DEBUG=handshake:playwright,handshake:message` - Communication Playwright
+- `DEBUG=handshake:page,handshake:message` - Communication bidirectionnelle
 - `DEBUG=*` - Tous les logs (inclut les dépendances)
 
 ## Logs d'erreur
 
-Les erreurs importantes restent affichées via `console.error` même sans DEBUG activé. 
+Les erreurs critiques (handshake failed, loading errors) restent affichées via `console.error` même sans DEBUG activé pour assurer le debugging en production.
+
+## Notes
+
+- Tous les `console.log` du code ont été remplacés par le système debug
+- Les logs de la page (ReactNativeWebView, post-me forwarding) sont redirigés vers `handshake:page`
+- En mode silencieux, seules les erreurs critiques s'affichent 

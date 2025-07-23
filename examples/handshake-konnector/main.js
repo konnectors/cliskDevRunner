@@ -862,6 +862,8 @@ async function main() {
   })
   await bridge.init()
   console.log('✅✅✅ handshake done')
+  await bridge.call('ping')
+  console.log('✅✅✅ ping called')
 }
 
 // Wait 2 seconds before launching main function
