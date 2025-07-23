@@ -496,12 +496,25 @@ export class CliskPage {
         oldUrl
       });
       
+      // Re-set content script type after reconnection (required by cozy-clisk connectors)
+      try {
+        const scriptType = this.pageName === 'pilot' ? 'pilot' : 'worker';
+        await this.connection.remoteHandle().call('setContentScriptType', scriptType);
+        this.navLog('🏷️ [%s] Content script type re-set to: %s after reconnection', this.pageName, scriptType);
+      } catch (error) {
+        this.navLog('⚠️ [%s] Failed to re-set content script type after reconnection: %O', this.pageName, error);
+      }
+      
       this.navLog('✅ [%s] Auto-reconnection successful!', this.pageName);
       this.log('🔄 [%s] Successfully reconnected after URL change', this.pageName);
       
       // Signal reconnection completion for any waiting promises
+      this.navLog('🔔 [%s] Checking for reconnection callback: %s', this.pageName, typeof this.onReconnectionComplete);
       if (this.onReconnectionComplete) {
+        this.navLog('📞 [%s] Calling onReconnectionComplete with URL: %s', this.pageName, newUrl);
         this.onReconnectionComplete(newUrl);
+      } else {
+        this.navLog('⚠️ [%s] No onReconnectionComplete callback found', this.pageName);
       }
       
     } catch (error) {
@@ -622,6 +635,28 @@ export class CliskPage {
         this.commLog('🎯 [%s] setWorkerState called with: %O', this.pageName, state);
         return await this.setWorkerState(state);
       };
+
+      baseMethods.runInWorker = async (method, ...args) => {
+        this.commLog('🔧 [%s] runInWorker called: method=%s, args=%O', this.pageName, method, args);
+        
+        if (!this.workerReference) {
+          throw new Error('Worker reference not set. Call setWorkerReference first.');
+        }
+        
+        if (!this.workerReference.connection) {
+          throw new Error('Worker connection not available.');
+        }
+        
+        try {
+          // Call the specified method on the worker with the provided arguments
+          const result = await this.workerReference.connection.remoteHandle().call(method, ...args);
+          this.commLog('✅ [%s] runInWorker result: %O', this.pageName, result);
+          return result;
+        } catch (error) {
+          this.commLog('❌ [%s] runInWorker error: %O', this.pageName, error);
+          throw error;
+        }
+      };
     }
 
     return baseMethods;
@@ -689,12 +724,22 @@ export class CliskPage {
     });
     
     // Setup a one-time listener for worker reconnection
+    const pilot = this; // Capture pilot reference for callback
+    this.log('🔧 [%s] Setting up onReconnectionComplete callback on worker', this.pageName);
     this.workerReference.onReconnectionComplete = (reconnectedUrl) => {
+      pilot.log('📞 [%s] onReconnectionComplete callback triggered for URL: %s', pilot.pageName, reconnectedUrl);
       // Find and resolve any pending promises for this URL
-      for (const [id, promise] of this.reconnectionPromises.entries()) {
-        if (promise.url === reconnectedUrl) {
-          this.log('✅ [%s] Worker reconnection complete for URL: %s (took %dms)', 
-            this.pageName, reconnectedUrl, Date.now() - promise.startTime);
+      for (const [id, promise] of pilot.reconnectionPromises.entries()) {
+        // Normalize URLs for comparison (remove trailing slash)
+        const normalizeUrl = (url) => url.replace(/\/$/, '');
+        const expectedUrl = normalizeUrl(promise.url);
+        const actualUrl = normalizeUrl(reconnectedUrl);
+        
+        pilot.log('🔍 [%s] Comparing URLs: expected="%s" actual="%s"', pilot.pageName, expectedUrl, actualUrl);
+        
+        if (expectedUrl === actualUrl) {
+          pilot.log('✅ [%s] Worker reconnection complete for URL: %s (took %dms)', 
+            pilot.pageName, reconnectedUrl, Date.now() - promise.startTime);
           promise.resolve({ 
             success: true, 
             url: reconnectedUrl, 

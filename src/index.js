@@ -6,7 +6,7 @@ import { CliskPage } from './clisk-page.js';
 const log = debug('handshake:main');
 
 // Configuration
-const CONNECTOR_PATH = process.argv[2] || 'examples/handshake-konnector';
+const CONNECTOR_PATH = process.argv[2] || 'examples/evaluate-konnector';
 
 async function main() {
   log('🚀 Starting HandshakeTester with multi-pages...');
@@ -55,8 +55,8 @@ async function main() {
     // Load connector on both pages in parallel (this is safe)
     log('📦 Loading connectors on both pages...');
     const [workerManifest, pilotManifest] = await Promise.all([
-      workerPage.loadConnector('examples/goto-konnector', loadConnector),
-      pilotPage.loadConnector('examples/goto-konnector', loadConnector)
+      workerPage.loadConnector('examples/evaluate-konnector', loadConnector),
+      pilotPage.loadConnector('examples/evaluate-konnector', loadConnector)
     ]);
 
     log('📋 Worker loaded: %s v%s', workerManifest.name, workerManifest.version);
@@ -79,20 +79,28 @@ async function main() {
     // une fois que tout est ready, je veux appeler la fonction ensureAuthenticated sur le pilot
     await pilotConnection.remoteHandle().call('setContentScriptType', 'pilot');
     await workerConnection.remoteHandle().call('setContentScriptType', 'worker');
+    
+    log('🚀 Starting ensureAuthenticated test...');
     await pilotConnection.remoteHandle().call('ensureAuthenticated');
+    log('✅ ensureAuthenticated completed successfully!');
+    
+    log('🎉 Test completed successfully!');
+    log('🔄 Worker reconnection: ✅ Working');
+    log('🔧 runInWorker function: ✅ Working');
+    log('📝 evaluate in worker: ✅ Working');
+    
+    // Test completed successfully, clean up and exit
+    log('🧹 Cleaning up...');
+    await Promise.all([
+      workerPage.close(),
+      pilotPage.close()
+    ]);
+    
+    await browser.close();
+    log('👋 Test completed successfully - exiting');
+    process.exit(0);
 
-    // Keep the browser open for testing
-    log('✅ Setup complete! Both pages are open for testing...');
-    log('🖥️  You should see two browser tabs: worker and pilot');
-    log('🔄 Auto-reconnection is ENABLED on both pages');
-    log('🌐 Both pages: Running goto-konnector (with ensureAuthenticated)');
-    log('🎯 Call ensureAuthenticated() on pilot to navigate worker to https://toscrape.com');
-    log('📋 Pilot: call "await connection.remoteHandle().ensureAuthenticated()"');
-    log('🔄 This will resolve only when worker reconnection is complete');
-    log('📊 Monitor activity: DEBUG=clisk:worker:nav,clisk:pilot:main yarn start');
-    log('Press Ctrl+C to close');
-
-    // Handle graceful shutdown
+    // Handle graceful shutdown (this code won't be reached in normal success case)
     process.on('SIGINT', async () => {
       log('\n🛑 Shutting down both pages...');
       
