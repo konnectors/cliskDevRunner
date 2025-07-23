@@ -3,7 +3,11 @@ import debug from 'debug';
 import { loadConnector } from './connector-loader.js';
 import { CliskPage } from './clisk-page.js';
 
-const log = debug('handshake:main');
+const log = debug('cli:main');
+
+
+
+
 
 // Configuration
 const CONNECTOR_PATH = process.argv[2] || 'examples/evaluate-konnector';
@@ -19,9 +23,27 @@ async function main() {
   });
   
   const context = await browser.newContext({
-    // Simulate mobile webview environment as per user memory
-    userAgent: 'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-    viewport: { width: 375, height: 667 }
+    // Simulate iPhone 12 mobile environment
+    // Additional mobile-specific settings
+    hasTouch: true,
+    isMobile: true,
+    locale: 'fr-FR',
+    timezoneId: 'Europe/Paris',
+    // Mobile-specific permissions
+    permissions: ['geolocation'],
+    // Mobile viewport settings (iPhone 12 dimensions)
+    viewport: { width: 390, height: 844 },
+    // Mobile user agent (iPhone 12)
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+    // Mobile-specific features
+    deviceScaleFactor: 3,
+    // Disable desktop features
+    javaScriptEnabled: true,
+    bypassCSP: false,
+    // Mobile-specific geolocation
+    geolocation: { longitude: -74.006, latitude: 40.7128 },
+    // Mobile-specific color scheme
+    colorScheme: 'light'
   });
 
   // Create two CliskPage instances
