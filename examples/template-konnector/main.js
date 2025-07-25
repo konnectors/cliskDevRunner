@@ -5778,7 +5778,7 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
     this.log('info', '🤖 after wait default selector')
     await this.runInWorker('click', defaultSelector)
     this.log('info', '🤖 after click')
-    await new Promise(resolve => setTimeout(resolve, 5000))    
+    // await new Promise(resolve => setTimeout(resolve, 5000))    
     await this.waitForElementInWorker(loginLinkSelector)
     this.log('info', '🤖 after wait')
   }
