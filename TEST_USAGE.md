@@ -1,75 +1,45 @@
-# Guide d'utilisation des tests
+# CliskDevRunner - Test Usage Guide
 
-## Scripts de test disponibles
+## Available test scripts
 
-### Tests complets
+### Complete tests
 ```bash
-# Tous les tests (7 tests, ~50s)
+# All tests (7 tests, ~50s)
 yarn test
 
-# Tous les tests avec output détaillé  
+# All tests with detailed output  
 yarn test:verbose
 
-# Mode watch (redémarre automatiquement)
+# Watch mode (automatically restarts)
 yarn test:watch
 ```
 
-### Tests filtrés individuels (plus rapide pour debug)
+### Individual filtered tests (faster for debugging)
 ```bash
-# Test ping simple (~7s)
+# Simple ping test (~7s)
 yarn test:ping
 
-# Test goto-konnector avec ensureAuthenticated (~10s)
+# Goto-konnector test with ensureAuthenticated (~10s)
 yarn test:goto
 
-# Test multi-pages simultanées (~7s)
+# Simultaneous multi-page test (~7s)
 yarn test:multi
 
-# Test contrôle pilot -> worker (~12s)
+# Pilot -> worker control test (~12s)
 yarn test:worker-control
 ```
 
-### Filtrage manuel (syntaxe directe)
+### Manual filtering (direct syntax)
 ```bash
-# Pour un filtrage personnalisé, utilisez directement :
-node --test --test-name-pattern="mot-clé" test/*.test.js
+# For custom filtering, use directly:
+node --test --test-name-pattern="keyword" test/*.test.js
 
-# Exemples :
+# Examples:
 node --test --test-name-pattern="ping" test/*.test.js
 node --test --test-name-pattern="goto" test/*.test.js  
 node --test --test-name-pattern="worker" test/*.test.js
 ```
 
-## Liste des tests disponibles
-
-1. **`should load handshake connector and call ping function`**
-   - Test basic de chargement connecteur et ping
-   - Durée: ~7s
-
-2. **`should handle connector events`**
-   - Test gestion d'événements
-   - Durée: ~6s
-
-3. **`should support multiple method calls`**
-   - Test appels multiples de méthodes
-   - Durée: ~6s
-
-4. **`should establish connection and respond to ping`**
-   - Test établissement connexion post-me
-   - Durée: ~5s
-
-5. **`should handle worker and pilot pages simultaneously`**
-   - Test multi-pages avec handshake simultané
-   - Durée: ~7s
-
-6. **`should allow pilot to control worker URL via setWorkerState`**
-   - Test contrôle URL worker par pilot
-   - Durée: ~12s
-
-7. **`should use goto-konnector ensureAuthenticated to navigate worker`**
-   - Test navigation via ensureAuthenticated
-   - Durée: ~10s
-
 ## Debugging
 
-Pour debug un test spécifique, utilisez les scripts individuels qui sont plus rapides et isolent les problèmes. 
+To debug a specific test, use the individual scripts which are faster and isolate problems. 

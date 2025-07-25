@@ -17,7 +17,7 @@ const log = getLogger('clisk:cli:main');
 const CONNECTOR_PATH = process.argv[2] || 'examples/evaluate-konnector';
 
 async function main() {
-  log('🚀 Starting HandshakeTester with PlaywrightLauncher...');
+  log('🚀 Starting CliskDevRunner...');
   log(`📁 Using connector: ${CONNECTOR_PATH}`);
   if (logLevel.toLowerCase() !== 'quiet') {
     log(`🔧 Log level: ${logLevel.toUpperCase()}`);

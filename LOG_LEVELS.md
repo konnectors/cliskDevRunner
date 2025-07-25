@@ -1,114 +1,114 @@
-# Log Levels Configuration
+# CliskDevRunner - Log Levels Configuration
 
-Ce projet utilise le système de debug pour contrôler les niveaux de logs. Voici les différents niveaux disponibles :
+This project uses the debug system to control log levels. Here are the different available levels:
 
-## Niveaux de Logs
+## Log Levels
 
 ### 🔥 EXTREME
-**Commande :** `npm run start:extreme` ou `DEBUG=clisk:* npm start`
+**Command:** `npm run start:extreme` or `DEBUG=clisk:* npm start`
 
-Affiche **TOUS** les logs, y compris :
-- Logs CLI et launcher
-- Logs des pages (pilot et worker)
-- Logs de communication post-me
-- Logs de navigation
-- Logs des messages
-- Logs de console des pages
+Displays **ALL** logs, including:
+- CLI and launcher logs
+- Page logs (pilot and worker)
+- Post-me communication logs
+- Navigation logs
+- Message logs
+- Page console logs
 
-**Utilisation :** Débogage complet, voir absolument tout ce qui se passe
+**Usage:** Complete debugging, see absolutely everything that happens
 
 ### 📊 FULL
-**Commande :** `npm run start:full` ou `DEBUG=clisk:cli:*,clisk:launcher:*,clisk:pilot:*,clisk:worker:* npm start`
+**Command:** `npm run start:full` or `DEBUG=clisk:cli:*,clisk:launcher:*,clisk:pilot:*,clisk:worker:* npm start`
 
-Affiche les logs principaux sans les détails des pages :
-- ✅ Logs CLI et launcher
-- ✅ Logs principaux des pages (pilot et worker)
-- ❌ Pas de logs de communication détaillés
-- ❌ Pas de logs de navigation
-- ❌ Pas de logs de console des pages
+Displays main logs without page details:
+- ✅ CLI and launcher logs
+- ✅ Main page logs (pilot and worker)
+- ❌ No detailed communication logs
+- ❌ No navigation logs
+- ❌ No page console logs
 
-**Utilisation :** Débogage général, voir le flux principal sans être submergé
+**Usage:** General debugging, see the main flow without being overwhelmed
 
 ### 📝 NORMAL
-**Commande :** `npm run start:normal` ou `DEBUG=clisk:cli:*,clisk:launcher:* npm start`
+**Command:** `npm run start:normal` or `DEBUG=clisk:cli:*,clisk:launcher:* npm start`
 
-Affiche seulement les logs essentiels :
-- ✅ Logs CLI et launcher
-- ❌ Pas de logs des pages
-- ❌ Pas de logs de communication
-- ❌ Pas de logs de navigation
+Displays only essential logs:
+- ✅ CLI and launcher logs
+- ❌ No page logs
+- ❌ No communication logs
+- ❌ No navigation logs
 
-**Utilisation :** Utilisation normale, logs minimaux pour suivre l'exécution
+**Usage:** Normal usage, minimal logs to follow execution
 
 ### 🔇 QUIET
-**Commande :** `npm run start:quiet` ou `npm start`
+**Command:** `npm run start:quiet` or `npm start`
 
-Aucun log de debug :
-- ❌ Aucun log de debug
-- ✅ Seulement les erreurs console.error
-- ✅ Seulement les messages console.log explicites
+No debug logs:
+- ❌ No debug logs
+- ✅ Only console.error errors
+- ✅ Only explicit console.log messages
 
-**Utilisation :** Production ou quand vous voulez un output minimal
+**Usage:** Production or when you want minimal output
 
-## Utilisation Avancée
+## Advanced Usage
 
-### Via Variable d'Environnement
+### Via Environment Variable
 ```bash
-# Définir le niveau via variable d'environnement
+# Set level via environment variable
 LOG_LEVEL=extreme npm start
 LOG_LEVEL=full npm start
 LOG_LEVEL=normal npm start
 LOG_LEVEL=quiet npm start
 ```
 
-### Via Paramètre de Ligne de Commande
+### Via Command Line Parameter
 ```bash
-# Le troisième paramètre définit le niveau de log
+# The third parameter sets the log level
 node src/index.js examples/evaluate-konnector extreme
 node src/index.js examples/evaluate-konnector full
 node src/index.js examples/evaluate-konnector normal
 node src/index.js examples/evaluate-konnector quiet
 ```
 
-### Via Variable DEBUG Directe
+### Via Direct DEBUG Variable
 ```bash
-# Utiliser directement la variable DEBUG pour un contrôle fin
+# Use DEBUG variable directly for fine control
 DEBUG=clisk:cli:*,clisk:launcher:* npm start
 DEBUG=clisk:pilot:* npm start
 DEBUG=clisk:worker:comm npm start
 ```
 
-## Tests avec Différents Niveaux
+## Tests with Different Levels
 
-Les mêmes niveaux sont disponibles pour les tests :
+The same levels are available for tests:
 
 ```bash
-npm run test:extreme    # Tous les logs pendant les tests
-npm run test:full       # Logs principaux pendant les tests
-npm run test:normal     # Logs minimaux pendant les tests
-npm run test            # Pas de logs de debug (quiet)
+npm run test:extreme    # All logs during tests
+npm run test:full       # Main logs during tests
+npm run test:normal     # Minimal logs during tests
+npm run test            # No debug logs (quiet)
 ```
 
-## Structure des Namespaces Debug
+## Debug Namespace Structure
 
 ```
-clisk:cli:main          # Logs du CLI principal
-clisk:launcher:playwright # Logs du launcher Playwright
-clisk:pilot:main        # Logs principaux de la page pilot
-clisk:pilot:page        # Logs de console de la page pilot
-clisk:pilot:message     # Logs de messages de la page pilot
-clisk:pilot:comm        # Logs de communication de la page pilot
-clisk:pilot:nav         # Logs de navigation de la page pilot
-clisk:worker:main       # Logs principaux de la page worker
-clisk:worker:page       # Logs de console de la page worker
-clisk:worker:message    # Logs de messages de la page worker
-clisk:worker:comm       # Logs de communication de la page worker
-clisk:worker:nav        # Logs de navigation de la page worker
+clisk:cli:main          # Main CLI logs
+clisk:launcher:playwright # Playwright launcher logs
+clisk:pilot:main        # Main pilot page logs
+clisk:pilot:page        # Pilot page console logs
+clisk:pilot:message     # Pilot page message logs
+clisk:pilot:comm        # Pilot page communication logs
+clisk:pilot:nav         # Pilot page navigation logs
+clisk:worker:main       # Main worker page logs
+clisk:worker:page       # Worker page console logs
+clisk:worker:message    # Worker page message logs
+clisk:worker:comm       # Worker page communication logs
+clisk:worker:nav        # Worker page navigation logs
 ```
 
-## Recommandations d'Usage
+## Usage Recommendations
 
-- **Développement initial :** `extreme` pour voir tout
-- **Débogage de problèmes :** `full` pour voir le flux principal
-- **Utilisation quotidienne :** `normal` pour un suivi basique
-- **Production/démonstration :** `quiet` pour un output propre 
+- **Initial development:** `extreme` to see everything
+- **Problem debugging:** `full` to see the main flow
+- **Daily usage:** `normal` for basic tracking
+- **Production/demo:** `quiet` for clean output 

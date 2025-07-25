@@ -1,95 +1,95 @@
-# Tests Automatisés
+# Automated Tests
 
-Ce dossier contient les tests automatisés pour valider le bon fonctionnement du système HandshakeTester.
+This folder contains automated tests to validate the proper functioning of the CliskDevRunner system.
 
-## 🧪 Tests disponibles
+## 🧪 Available Tests
 
 ### `handshake.test.js`
-Tests principaux qui valident :
+Main tests that validate:
 
-1. **Chargement du connecteur**
-   - Charge le handshake-konnector depuis `examples/`
-   - Valide le manifest (nom, version)
-   - Confirme l'établissement de la connexion post-me
+1. **Connector loading**
+   - Loads the handshake-konnector from `examples/`
+   - Validates the manifest (name, version)
+   - Confirms post-me connection establishment
 
-2. **Appel de la fonction ping**
-   - Utilise un spy pour tracker les appels de méthodes
-   - Confirme que le connecteur appelle bien `ping()` automatiquement
-   - Valide que la réponse contient le nom de la page
+2. **Ping function call**
+   - Uses a spy to track method calls
+   - Confirms that the connector automatically calls `ping()`
+   - Validates that the response contains the page name
 
-3. **Gestion des événements**
-   - Teste la réception d'événements émis par le connecteur
-   - Valide la structure des données d'événement
+3. **Event handling**
+   - Tests receiving events emitted by the connector
+   - Validates event data structure
 
-4. **Appels multiples de méthodes**
-   - Tracks tous les appels de méthodes locales
-   - Confirme que plusieurs méthodes peuvent être appelées
+4. **Multiple method calls**
+   - Tracks all local method calls
+   - Confirms that multiple methods can be called
 
-5. **Connexion et réactivité**
-   - Teste l'établissement de la connexion post-me
-   - Valide que le système reste réactif
+5. **Connection and responsiveness**
+   - Tests post-me connection establishment
+   - Validates that the system remains responsive
 
-6. **Worker et Pilot simultanés** ⭐
-   - Crée deux pages indépendantes (worker et pilot)
-   - Valide les handshakes simultanés sur les deux pages
-   - Confirme que `ping()` est appelée sur chaque page
-   - Vérifie l'isolation complète entre les pages
-   - Teste l'architecture multi-pages en conditions réelles
+6. **Simultaneous Worker and Pilot** ⭐
+   - Creates two independent pages (worker and pilot)
+   - Validates simultaneous handshakes on both pages
+   - Confirms that `ping()` is called on each page
+   - Verifies complete isolation between pages
+   - Tests multi-page architecture in real conditions
 
-## 🚀 Utilisation
+## 🚀 Usage
 
-### Exécuter tous les tests
+### Run all tests
 ```bash
 yarn test
 ```
 
-### Tests en mode watch (re-exécution automatique lors de changements)
+### Tests in watch mode (automatic re-execution on changes)
 ```bash
 yarn test:watch
 ```
 
-### Tests avec sortie détaillée
+### Tests with detailed output
 ```bash
 yarn test:verbose
 ```
 
-### Exécuter un test spécifique
+### Run a specific test
 ```bash
 node --test test/handshake.test.js
 ```
 
-## 🏗 Architecture des tests
+## 🏗 Test Architecture
 
-Les tests utilisent :
-- **Node.js built-in test runner** (pas de dépendance externe)
-- **Playwright** pour l'automatisation du navigateur
-- **CliskPage** pour l'isolation des pages de test
-- **Mode headless** pour une exécution rapide
-- **Spies/Mocks** via héritage de classe pour tracker les appels
+Tests use:
+- **Node.js built-in test runner** (no external dependency)
+- **Playwright** for browser automation
+- **CliskPage** for test page isolation
+- **Headless mode** for fast execution
+- **Spies/Mocks** via class inheritance to track calls
 
-### Exemple de test personnalisé
+### Custom test example
 
 ```javascript
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { CliskPage } from '../src/clisk-page.js';
 
-describe('Mon Test Custom', () => {
+describe('My Custom Test', () => {
   let testPage;
 
   test('should do something', async () => {
-    // Créer une page de test personnalisée
+    // Create a custom test page
     class MyTestPage extends CliskPage {
       getLocalMethods() {
         const methods = super.getLocalMethods();
-        // Ajouter des spies ou modifications
+        // Add spies or modifications
         return methods;
       }
     }
 
     testPage = new MyTestPage(context, 'my-test');
     
-    // Votre logique de test ici
+    // Your test logic here
     await testPage.init();
     // ...
     
@@ -98,7 +98,7 @@ describe('Mon Test Custom', () => {
 });
 ```
 
-## 📊 Résultats attendus
+## 📊 Expected Results
 
 ```
 ▶ Handshake Connector Tests
@@ -116,38 +116,38 @@ describe('Mon Test Custom', () => {
 
 ## 🔧 Configuration
 
-Les tests utilisent un navigateur en mode headless pour la rapidité :
+Tests use a headless browser for speed:
 - **User Agent** : Android Mobile WebView
 - **Viewport** : 375x667 (mobile)
-- **Sécurité** : Désactivée pour les tests
-- **Sandbox** : Désactivé
+- **Security** : Disabled for tests
+- **Sandbox** : Disabled
 
 ## 🐛 Debugging
 
-Pour débugger un test qui échoue :
+To debug a failing test:
 
-1. **Activer le mode visible** :
+1. **Enable visible mode** :
    ```javascript
    browser = await chromium.launch({ 
-     headless: false, // Voir le navigateur
-     slowMo: 1000     // Ralentir les actions
+     headless: false, // See the browser
+     slowMo: 1000     // Slow down actions
    });
    ```
 
-2. **Ajouter des logs de debug** :
+2. **Add debug logs** :
    ```bash
    DEBUG=clisk:* yarn test
    ```
 
-3. **Augmenter les timeouts** si nécessaire :
+3. **Increase timeouts** if necessary :
    ```javascript
    await new Promise(resolve => setTimeout(resolve, 5000));
    ```
 
 ## 📝 Conventions
 
-- **Noms de tests** : Descriptifs en anglais commençant par "should"
-- **Structure AAA** : Arrange, Act, Assert
-- **Cleanup** : Chaque test nettoie ses ressources dans `afterEach`
-- **Isolation** : Chaque test utilise sa propre instance de CliskPage
-- **Timeouts** : Adaptés à la vitesse du handshake (2-5 secondes) 
+- **Test names** : Descriptive in English starting with "should"
+- **AAA structure** : Arrange, Act, Assert
+- **Cleanup** : Each test cleans up its resources in `afterEach`
+- **Isolation** : Each test uses its own CliskPage instance
+- **Timeouts** : Adapted to handshake speed (2-5 seconds) 

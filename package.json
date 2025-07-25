@@ -1,7 +1,7 @@
 {
-  "name": "handshake-tester",
+  "name": "clisk-dev-runner",
   "version": "1.0.0",
-  "description": "Projet simple pour tester les connecteurs avec playwright et post-me",
+  "description": "Projet simple pour tester les connecteurs clisk avec Playwright dans un environnement simulant React Native webview",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -23,9 +23,10 @@
   },
   "keywords": [
     "playwright",
-    "post-me",
     "connector",
-    "handshake"
+    "react-native",
+    "webview",
+    "clisk"
   ],
   "author": "",
   "license": "MIT",

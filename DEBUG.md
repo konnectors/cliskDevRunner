@@ -1,109 +1,109 @@
-# Debug Logging Guide
+# CliskDevRunner - Debug Logging Guide
 
-Ce projet utilise la librairie `debug` pour des logs filtrés et modulaires.
+This project uses the `debug` library for filtered and modular logs.
 
-## Namespaces disponibles
+## Available Namespaces
 
-### Logs principaux
-- `handshake:main` - Orchestration générale du programme
+### Main logs
+- `handshake:main` - General program orchestration
 
-### Logs par page (worker/pilot)
-Chaque page a ses propres namespaces isolés :
+### Per-page logs (worker/pilot)
+Each page has its own isolated namespaces:
 
-- `clisk:worker:main` / `clisk:pilot:main` - Lifecycle de la page
-- `clisk:worker:page` / `clisk:pilot:page` - Console de la page web
-- `clisk:worker:message` / `clisk:pilot:message` - Messages post-me détaillés
-- `clisk:worker:comm` / `clisk:pilot:comm` - Communication et handshake
-- `clisk:worker:nav` / `clisk:pilot:nav` - **Navigation et auto-reconnection** ⭐
+- `clisk:worker:main` / `clisk:pilot:main` - Page lifecycle
+- `clisk:worker:page` / `clisk:pilot:page` - Web page console
+- `clisk:worker:message` / `clisk:pilot:message` - Detailed post-me messages
+- `clisk:worker:comm` / `clisk:pilot:comm` - Communication and handshake
+- `clisk:worker:nav` / `clisk:pilot:nav` - **Navigation and auto-reconnection** ⭐
 
-### Logs du connecteur
-- `clisk:connector` - Chargement et injection des connecteurs
+### Connector logs
+- `clisk:connector` - Loading and injection of connectors
 
-## Exemples d'utilisation
+## Usage Examples
 
-### Démarrage normal
+### Normal startup
 ```bash
 yarn start
 ```
 
-### Logs principaux seulement
+### Main logs only
 ```bash
 DEBUG=handshake:main yarn start
 ```
 
-### Logs d'une page spécifique
+### Specific page logs
 ```bash
 DEBUG=clisk:worker:* yarn start
 DEBUG=clisk:pilot:* yarn start
 ```
 
-### Logs de navigation et auto-reconnection ⭐
+### Navigation and auto-reconnection logs ⭐
 ```bash
 DEBUG=clisk:worker:nav,clisk:pilot:nav yarn start
 ```
 
-### Logs de communication seulement
+### Communication logs only
 ```bash
 DEBUG=clisk:*:comm yarn start
 ```
 
-### Tous les logs
+### All logs
 ```bash
 DEBUG=* yarn start
 ```
 
-### Logs multi-pages avec communication
+### Multi-page logs with communication
 ```bash
 DEBUG=handshake:main,clisk:*:main,clisk:*:comm yarn start
 ```
 
-## Fonctionnalité Auto-Reconnection ⭐
+## Auto-Reconnection Feature ⭐
 
-La nouvelle fonctionnalité d'auto-reconnection permet au système de maintenir la communication avec les connecteurs même quand l'utilisateur navigue vers de nouvelles URLs.
+The new auto-reconnection feature allows the system to maintain communication with connectors even when the user navigates to new URLs.
 
-### Comment ça fonctionne
-1. **Détection automatique** des changements d'URL via `framenavigated`
-2. **Fermeture propre** de l'ancienne connexion post-me
-3. **Réinjection automatique** du connecteur sur la nouvelle page
-4. **Rétablissement** de la communication post-me
+### How it works
+1. **Automatic detection** of URL changes via `framenavigated`
+2. **Clean closure** of the old post-me connection
+3. **Automatic reinjection** of the connector on the new page
+4. **Reestablishment** of post-me communication
 
-### Comment tester
-1. Démarrer le système : `yarn start`
-2. Dans un onglet, naviguer vers n'importe quelle URL (ex: google.com)
-3. Observer les logs de reconnection automatique
-4. Vérifier que la communication fonctionne toujours
+### How to test
+1. Start the system: `yarn start`
+2. In a tab, navigate to any URL (e.g. google.com)
+3. Observe the automatic reconnection logs
+4. Verify that communication still works
 
-### Logs spécifiques
+### Specific logs
 ```bash
-# Surveiller la navigation et reconnection
+# Monitor navigation and reconnection
 DEBUG=clisk:worker:nav,clisk:pilot:nav yarn start
 
-# Voir tout le processus de reconnection
+# See the entire reconnection process
 DEBUG=clisk:*:nav,clisk:*:comm yarn start
 ```
 
-### Contrôle programmatique
+### Programmatic control
 ```javascript
-// Désactiver l'auto-reconnection
+// Disable auto-reconnection
 workerPage.setAutoReconnect(false);
 
-// Réactiver l'auto-reconnection  
+// Re-enable auto-reconnection  
 pilotPage.setAutoReconnect(true);
 
-// Forcer une reconnection manuelle
+// Force manual reconnection
 await workerPage.manualReconnect();
 ```
 
-## Architecture Multi-Pages
+## Multi-Page Architecture
 
-Le système supporte maintenant parfaitement les pages multiples avec :
-- **Communication isolée** par page
-- **Logs séparés** par namespace
-- **Auto-reconnection indépendante** par page
-- **Performance optimisée** (parallélisme quand possible)
+The system now perfectly supports multiple pages with:
+- **Isolated communication** per page
+- **Separate logs** per namespace
+- **Independent auto-reconnection** per page
+- **Optimized performance** (parallelism when possible)
 
-### Initialisation
-- Pages : **séquentiel** (évite les conflits Playwright `exposeFunction`)
-- Navigation : **parallèle** (sécurisé)
-- Chargement connecteurs : **parallèle** (sécurisé)
-- Handshakes : **parallèle** (sécurisé après init séquentiel) 
+### Initialization
+- Pages: **sequential** (avoids Playwright `exposeFunction` conflicts)
+- Navigation: **parallel** (safe)
+- Connector loading: **parallel** (safe)
+- Handshakes: **parallel** (safe after sequential init) 
