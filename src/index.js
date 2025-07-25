@@ -26,24 +26,9 @@ async function main() {
   const launcher = new PlaywrightLauncher();
   
   try {
-    // Initialize the launcher
     await launcher.init(CONNECTOR_PATH);
-    
-    // Start the launcher (this will call ensureAuthenticated)
     await launcher.start();
-    
-    log('🎉 Test completed successfully!');
-    log('🔄 Worker reconnection: ✅ Working');
-    log('🔧 runInWorker function: ✅ Working');
-    log('📝 evaluate in worker: ✅ Working');
-    
-    // Clean up and exit
-    log('🧹 Cleaning up...');
     await launcher.stop();
-    
-    log('👋 Test completed successfully - exiting');
-    // process.exit(0);
-
   } catch (error) {
     console.error('❌ Test failed:', error);
     

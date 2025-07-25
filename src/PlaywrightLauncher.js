@@ -52,16 +52,14 @@ class PlaywrightLauncher {
     this.pilotPage.setWorkerReference(this.workerPage);
     
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
-    log('📄 Initializing pages sequentially to avoid function exposure conflicts...');
+
+    await this.pilotPage.init();
+    log('✅ Pilot page initialized');
     
     await this.workerPage.init();
     log('✅ Worker page initialized');
     
-    await this.pilotPage.init();
-    log('✅ Pilot page initialized');
-
     // Navigate both pages to blank page
-    log('🌐 Navigating both pages...');
     await Promise.all([
       this.workerPage.navigate('about:blank'),
       this.pilotPage.navigate('about:blank')
@@ -74,16 +72,11 @@ class PlaywrightLauncher {
       this.pilotPage.loadConnector(this.connectorPath, loadConnector)
     ]);
 
-    log('📋 Worker loaded: %s v%s', workerManifest.name, workerManifest.version);
-    log('📋 Pilot loaded: %s v%s', pilotManifest.name, pilotManifest.version);
-
     // Initiate handshakes in parallel
-    log('🤝 Starting handshakes in parallel...');
     const [workerConnection, pilotConnection] = await Promise.all([
       this.workerPage.initiateHandshake(),
       this.pilotPage.initiateHandshake()
     ]);
-    log('✅ Both handshakes completed simultaneously');
 
     // Set content script types
     await pilotConnection.remoteHandle().call('setContentScriptType', 'pilot');
@@ -101,19 +94,14 @@ class PlaywrightLauncher {
     log('🚀 Starting PlaywrightLauncher...');
     
     try {
-      // Get pilot connection
       const pilotConnection = this.pilotPage.getConnection();
       if (!pilotConnection) {
         throw new Error('Pilot connection not available');
       }
       
-      // Call ensureAuthenticated on the pilot
       log('🔐 Calling ensureAuthenticated on pilot...');
       await pilotConnection.remoteHandle().call('ensureAuthenticated', {account: {}});
       log('✅ ensureAuthenticated completed successfully!');
-      
-      log('🎉 PlaywrightLauncher started successfully!');
-      
     } catch (error) {
       log('❌ Error during start: %O', error);
       throw error;
@@ -124,27 +112,20 @@ class PlaywrightLauncher {
     log('🛑 Stopping PlaywrightLauncher...');
     
     try {
-      // Close both pages
       if (this.workerPage) {
         await this.workerPage.close();
-        log('✅ Worker page closed');
       }
       
       if (this.pilotPage) {
         await this.pilotPage.close();
-        log('✅ Pilot page closed');
       }
       
-      // Close browser context
       if (this.context) {
         await this.context.close();
-        log('✅ Browser context closed');
       }
       
-      // Close browser
       if (this.browser) {
         await this.browser.close();
-        log('✅ Browser closed');
       }
       
       // Reset state
