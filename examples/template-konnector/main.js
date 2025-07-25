@@ -5764,13 +5764,35 @@ __webpack_require__.r(__webpack_exports__);
 const log = _cozy_minilog__WEBPACK_IMPORTED_MODULE_1___default()('ContentScript')
 _cozy_minilog__WEBPACK_IMPORTED_MODULE_1___default().enable()
 
+const baseUrl = 'https://toscrape.com'
+const defaultSelector = "a[href='http://quotes.toscrape.com']"
+const loginLinkSelector = `[href='/login']`
+const logoutLinkSelector = `[href='/logout']`
+
 class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPORTED_MODULE_0__.ContentScript {
+  async navigateToLoginForm() {
+    this.log('info', '🤖 navigateToLoginForm')
+    await this.goto(baseUrl)
+    this.log('info', '🤖 after goto')
+    await this.waitForElementInWorker(defaultSelector)
+    this.log('info', '🤖 after wait default selector')
+    await this.runInWorker('click', defaultSelector)
+    this.log('info', '🤖 after click')
+    await new Promise(resolve => setTimeout(resolve, 5000))    
+    await this.waitForElementInWorker(loginLinkSelector)
+    this.log('info', '🤖 after wait')
+  }
   async ensureAuthenticated() {
     this.log('info', '🤖 ensureAuthenticated')
-    await this.goto('https://quotes.toscrape.com/login')
-    await this.waitForElementInWorker('#username')
-    this.log('info', '🤖 ensureAuthenticated success')
+    await this.navigateToLoginForm()
+    this.log('info', '🤖 navigateToLoginForm')
+    // const authenticated = await this.runInWorker('checkAuthenticated')
+    // this.log('authenticated: ' + authenticated)
     return true
+  }
+
+  async checkAuthenticated() {
+    return Boolean(document.querySelector(logoutLinkSelector))
   }
 }
 
