@@ -16,6 +16,8 @@ The goal is to allow developers to create clisk connectors with the lightest pos
 
 - **Console logs** : All console messages that arrive in the page are shown in the standard output of the program.
 
+- **Configuration management** : Uses the `conf` library to manage settings with file-based configuration and command line overrides.
+
 ## Architecture
 
 The project uses a multi-page architecture with:
@@ -29,6 +31,79 @@ The project uses a multi-page architecture with:
 ```bash
 yarn install
 ```
+
+## Configuration
+
+The application uses a configuration system with the following hierarchy (highest priority first):
+
+1. **Command line arguments** - Override all other settings
+2. **Environment variables** - LOG_LEVEL, DEBUG
+3. **Local configuration file** - `config.json` in the project root
+4. **User configuration file** - `~/.config/clisk-dev-runner-nodejs/config.json`
+5. **Default values** - Built-in defaults
+
+### Local Configuration File
+
+The project includes a local `config.json` file that serves as the default configuration. This file is **not versioned** in Git to allow each developer to have their own personal settings.
+
+**File location**: `./config.json` (ignored by Git)
+
+To set up your local configuration:
+
+1. Copy the example configuration:
+   ```bash
+   cp config.example.json config.json
+   ```
+
+2. Modify `config.json` with your preferred settings:
+   ```json
+   {
+     "connector": "examples/evaluate-konnector",
+     "logLevel": "normal",
+     "stayOpen": false,
+     "browser": {
+       "headless": false,
+       "args": ["--no-sandbox", "--disable-web-security"]
+     },
+     "mobile": {
+       "hasTouch": true,
+       "isMobile": true,
+       "locale": "fr-FR",
+       "timezoneId": "Europe/Paris",
+       "viewport": {
+         "width": 390,
+         "height": 844
+       },
+       "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
+       "deviceScaleFactor": 3,
+       "geolocation": {
+         "longitude": -74.006,
+         "latitude": 40.7128
+       }
+     }
+   }
+   ```
+
+**Note**: The `config.json` file is ignored by Git to prevent personal settings from being committed to the repository.
+
+### User Configuration File
+
+You can also create a personal configuration file that will override the local defaults:
+
+**File location**: `~/.config/clisk-dev-runner-nodejs/config.json`
+
+This file is created automatically when you first run the application and can be used to set your personal preferences.
+
+Configuration:
+  The application uses a configuration file that can be overridden by command line options.
+  Configuration file location: ./config.json
+  
+  You can set default values in the config file:
+  - connector: Default connector to use
+  - logLevel: Default log level
+  - stayOpen: Default stay-open behavior
+  - browser: Browser launch options
+  - mobile: Mobile simulation settings
 
 ## Command Line Interface
 
@@ -60,6 +135,9 @@ node src/index.js examples/evaluate-konnector
 # Stay open mode
 -s, --stay-open             Keep browser window open after connector execution
                             User must manually close the browser window to exit
+
+# Connector path
+-c, --connector <path>      Specify connector path
 ```
 
 ### Examples
@@ -107,7 +185,6 @@ yarn start examples/minimal-konnector
 # Evaluation connector
 yarn start examples/evaluate-konnector
 
-
 # Default connector (evaluate-konnector)
 yarn start
 ```
@@ -140,12 +217,13 @@ npm run start:quiet
 
 ## Project Structure
 
-- `src/index.js` - Main file with command line interface
+- `src/index.js` - Main file with command line interface and configuration
 - `src/log-config.js` - Log levels configuration
 - `src/PlaywrightLauncher.js` - Playwright manager
 - `src/connector-loader.js` - Connector loader
 - `examples/` - Existing test connectors
 - `package.json` - Dependencies configuration
+- `config.example.json` - Example configuration file (copy to `config.json` for local settings)
 
 ## Tests
 
