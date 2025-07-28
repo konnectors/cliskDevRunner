@@ -30,14 +30,72 @@ The project uses a multi-page architecture with:
 yarn install
 ```
 
-## Launch
+## Command Line Interface
 
-### Simplest handshake connector
+The project provides a flexible command line interface with various options:
 
-To launch the project with the simplest handshake connector:
+### Basic Usage
 
 ```bash
-yarn start examples/handshake-konnector
+# Show help
+node src/index.js --help
+
+# Run with default connector
+node src/index.js
+
+# Run with specific connector
+node src/index.js examples/evaluate-konnector
+```
+
+### Available Options
+
+```bash
+# Help
+-h, --help                  Show help message
+
+# Log level
+-l, --log-level <level>     Set log level: quiet, normal, full, extreme (default: normal)
+                            Can also be set via LOG_LEVEL environment variable
+
+# Stay open mode
+-s, --stay-open             Keep browser window open after connector execution
+                            User must manually close the browser window to exit
+```
+
+### Examples
+
+```bash
+# Run with full logging
+node src/index.js --log-level full examples/goto-konnector
+
+# Run in quiet mode
+node src/index.js -l quiet examples/minimal-konnector
+
+# Keep browser open for inspection
+node src/index.js --stay-open examples/evaluate-konnector
+
+# Combine options
+node src/index.js --stay-open --log-level extreme examples/goto-konnector
+```
+
+### Environment Variables
+
+```bash
+# Set log level via environment variable
+LOG_LEVEL=full node src/index.js examples/evaluate-konnector
+
+# Enable quiet mode
+DEBUG="" node src/index.js examples/evaluate-konnector
+```
+
+## Launch (Legacy)
+
+### Simplest goto connector
+
+To launch the project with the simplest goto connector:
+
+```bash
+yarn start examples/goto-konnector
 ```
 
 ### Other available connectors
@@ -49,8 +107,6 @@ yarn start examples/minimal-konnector
 # Evaluation connector
 yarn start examples/evaluate-konnector
 
-# Navigation connector
-yarn start examples/goto-konnector
 
 # Default connector (evaluate-konnector)
 yarn start
@@ -84,7 +140,7 @@ npm run start:quiet
 
 ## Project Structure
 
-- `src/index.js` - Main file
+- `src/index.js` - Main file with command line interface
 - `src/log-config.js` - Log levels configuration
 - `src/PlaywrightLauncher.js` - Playwright manager
 - `src/connector-loader.js` - Connector loader
