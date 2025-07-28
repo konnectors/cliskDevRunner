@@ -5,11 +5,13 @@
 
 import { ParentHandshake } from 'post-me';
 import debug from 'debug';
+import { EventEmitter } from 'events';
 
 /**
  * CliskPage class - manages a single page with isolated communication and logging
+ * Extends EventEmitter to provide event-driven architecture
  */
-export class CliskPage {
+export class CliskPage extends EventEmitter {
   /**
    * Create a new CliskPage instance
    * @param {Object} context - Browser context from Playwright
@@ -17,6 +19,8 @@ export class CliskPage {
    * @param {Object} options - Configuration options
    */
   constructor(context, pageName, options = {}) {
+    super(); // Call EventEmitter constructor
+    
     this.context = context;
     this.pageName = pageName;
     this.options = {
@@ -52,10 +56,6 @@ export class CliskPage {
     
     // Additional local methods (can be extended by services)
     this.additionalLocalMethods = {};
-    
-    // Reconnection callbacks (used by services)
-    this.onReconnectionComplete = null;
-    this.onReconnectionFailure = null;
   }
 
   /**
@@ -291,13 +291,6 @@ export class CliskPage {
       
       this.commLog('✅ Post-me handshake successful!');
       
-      // Emit ready event
-      this.connection.localHandle().emit('playwright-ready', { 
-        message: `Playwright page ${this.pageName} is ready!`,
-        timestamp: Date.now(),
-        pageName: this.pageName
-      });
-      
       this.commLog('🎯 Post-me connection fully established!');
       
       // Set content script type if provided
@@ -309,6 +302,15 @@ export class CliskPage {
           this.commLog('⚠️ [%s] Failed to set content script type: %O', this.pageName, error);
         }
       }
+
+      // Emit handshake success event
+      this.emit('connection:success', { 
+        pageName: this.pageName, 
+        connection: this.connection,
+        url: this.page.url(),
+        timestamp: Date.now(),
+        duration: Date.now() - this.handshakeStartTime
+      });
       
       return this.connection;
       
@@ -525,9 +527,17 @@ export class CliskPage {
       postMessage: async (message, transfer) => {
         this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
         
-        await this.page.evaluate((msg) => {
-          window.postMessage(msg, '*');
-        }, message);
+        try {
+          await this.page.evaluate((msg) => {
+            window.postMessage(msg, '*');
+          }, message);
+        } catch (error) {
+          if (error.message && error.message.includes('Execution context was destroyed')) {
+            this.commLog('🔄 Execution context destroyed during postMessage, treating as navigation for message: ' + JSON.stringify(message));
+            throw new Error('EXECUTION_CONTEXT_DESTROYED: Navigation occurred during message sending');
+          }
+          throw error;
+        }
       },
       
       addMessageListener: (listener) => {

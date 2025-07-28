@@ -5768,7 +5768,7 @@ const baseUrl = 'https://toscrape.com'
 
 class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPORTED_MODULE_0__.ContentScript {
   async ensureAuthenticated() {
-    this.goto(baseUrl)
+    await this.goto(baseUrl)
     return true
   }
 }

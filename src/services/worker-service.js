@@ -1,11 +1,15 @@
 import debug from 'debug';
+import { EventEmitter } from 'events';
 
 /**
  * WorkerService - Gère la logique spécifique au worker
  * Responsable de la gestion des changements d'URL et des reconnexions automatiques
+ * Extends EventEmitter to provide event-driven architecture
  */
-export class WorkerService {
+export class WorkerService extends EventEmitter {
   constructor(workerPage) {
+    super(); // Call EventEmitter constructor
+    
     this.workerPage = workerPage;
     this.log = debug('clisk:worker-service');
     this.navLog = debug('clisk:worker-service:nav');
@@ -14,6 +18,34 @@ export class WorkerService {
     this.currentUrl = null;
     this.urlChangeTimeout = null;
     this.isMonitoringEnabled = false;
+    this.activeTimers = new Set(); // Track active timers for cleanup
+    
+    // Reconnection promise state
+    this.currentReconnectionPromise = null;
+    this.reconnectionResolve = null;
+    this.reconnectionReject = null;
+  }
+
+  /**
+   * Create a tracked timeout that will be automatically cleaned up
+   */
+  createTrackedTimeout(callback, delay) {
+    const timeoutId = setTimeout(() => {
+      this.activeTimers.delete(timeoutId);
+      callback();
+    }, delay);
+    this.activeTimers.add(timeoutId);
+    return timeoutId;
+  }
+
+  /**
+   * Clear a tracked timeout
+   */
+  clearTrackedTimeout(timeoutId) {
+    if (timeoutId && this.activeTimers.has(timeoutId)) {
+      clearTimeout(timeoutId);
+      this.activeTimers.delete(timeoutId);
+    }
   }
 
   /**
@@ -106,43 +138,73 @@ export class WorkerService {
    * Handle URL change and attempt reconnection
    * @param {string} newUrl - New URL
    * @param {string} oldUrl - Previous URL
+   * @returns {Promise<boolean>} Promise that resolves with true if reconnection is successful
    * @private
    */
   async handleUrlChange(newUrl, oldUrl) {
     if (!this.isMonitoringEnabled) {
       this.navLog('⚠️ URL monitoring disabled, skipping auto-reconnection');
-      return;
+      return false;
     }
+
+    // Create new reconnection promise if none exists or previous one is settled
+    if (!this.currentReconnectionPromise || this.currentReconnectionPromise.settled) {
+      this.currentReconnectionPromise = new Promise((resolve, reject) => {
+        this.reconnectionResolve = resolve;
+        this.reconnectionReject = reject;
+      });
+      this.currentReconnectionPromise.settled = false;
+    }
+
+    // Emit url-change event
+    this.emit('url-change', {
+      newUrl,
+      oldUrl,
+      pageName: this.workerPage ? this.workerPage.pageName : 'unknown',
+      timestamp: Date.now(),
+      isMonitoringEnabled: this.isMonitoringEnabled
+    });
 
     const page = this.workerPage.getPage();
     
     // Check if page is still valid and context is not closed
     if (!page || page.isClosed()) {
       this.navLog('⚠️ Page is closed, skipping auto-reconnection');
-      return;
+      this.reconnectionReject(new Error('Page is closed'));
+      return false;
     }
     
     // Check if browser context is still valid
     try {
       if (!page.context() || page.context().isConnected && !page.context().isConnected()) {
         this.navLog('⚠️ Browser context is disconnected, skipping auto-reconnection');
-        return;
+        this.reconnectionReject(new Error('Browser context is disconnected'));
+        return false;
       }
     } catch (error) {
       this.navLog('⚠️ Cannot access browser context, skipping auto-reconnection: %O', error);
-      return;
+      this.reconnectionReject(new Error('Cannot access browser context'));
+      return false;
     }
     
     // Set a timeout for the entire reconnection process
-    const reconnectionTimeout = setTimeout(() => {
+    const reconnectionTimeout = this.createTrackedTimeout(() => {
       this.navLog('⏰ Reconnection timeout after 15 seconds');
-      if (this.workerPage.onReconnectionFailure) {
-        this.workerPage.onReconnectionFailure(newUrl, new Error('Reconnection timeout'));
-      }
+      this.reconnectionReject(new Error('Reconnection timeout after 15 seconds'));
     }, 15000);
+    
+    const startTime = Date.now();
     
     try {
       this.navLog('🔄 Starting auto-reconnection process...');
+      
+      // Emit reconnection start event
+      this.emit('reconnection:start', {
+        newUrl,
+        oldUrl,
+        pageName: this.workerPage ? this.workerPage.pageName : 'unknown',
+        timestamp: startTime
+      });
       
       // Close existing connection if any
       const connection = this.workerPage.getConnection();
@@ -159,8 +221,9 @@ export class WorkerService {
       // Check again if page is still valid after closing connection
       if (!page || page.isClosed()) {
         this.navLog('⚠️ Page was closed during reconnection, aborting');
-        clearTimeout(reconnectionTimeout);
-        return;
+        this.clearTrackedTimeout(reconnectionTimeout);
+        this.reconnectionReject(new Error('Page was closed during reconnection'));
+        return false;
       }
       
       // Wait a bit for the new page to load
@@ -170,8 +233,9 @@ export class WorkerService {
       } catch (error) {
         if (error.message.includes('Target page, context or browser has been closed')) {
           this.navLog('⚠️ Page closed during stabilization, aborting reconnection');
-          clearTimeout(reconnectionTimeout);
-          return;
+          this.clearTrackedTimeout(reconnectionTimeout);
+          this.reconnectionReject(new Error('Page closed during stabilization'));
+          return false;
         }
         throw error;
       }
@@ -188,6 +252,7 @@ export class WorkerService {
           this.navLog('✅ Connector re-injected successfully');
         } catch (error) {
           this.navLog('❌ Failed to re-inject connector: %O', error);
+          this.reconnectionReject(error);
           throw error;
         }
       } else {
@@ -200,29 +265,40 @@ export class WorkerService {
       // Check one more time if page is still valid before handshake
       if (!page || page.isClosed()) {
         this.navLog('⚠️ Page was closed before handshake, aborting');
-        clearTimeout(reconnectionTimeout);
-        return;
+        this.clearTrackedTimeout(reconnectionTimeout);
+        this.reconnectionReject(new Error('Page was closed before handshake'));
+        return false;
       }
       
       // Create a promise with timeout for handshake
       const handshakePromise = this.workerPage.initiateHandshake({}, 'worker');
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Handshake timeout')), 10000);
+        this.createTrackedTimeout(() => reject(new Error('Handshake timeout')), 10000);
       });
       
       const newConnection = await Promise.race([handshakePromise, timeoutPromise]);
       
       this.navLog('✅ Auto-reconnection successful!');
-      clearTimeout(reconnectionTimeout);
       
-      // Signal reconnection completion
-      if (this.workerPage.onReconnectionComplete) {
-        this.navLog('📞 Calling onReconnectionComplete with URL: %s', newUrl);
-        this.workerPage.onReconnectionComplete(newUrl);
-      }
+      // Emit reconnection success event
+      this.emit('reconnection:success', {
+        newUrl,
+        oldUrl,
+        connection: newConnection,
+        pageName: this.workerPage ? this.workerPage.pageName : 'unknown',
+        timestamp: Date.now(),
+        duration: Date.now() - startTime
+      });
       
+      this.clearTrackedTimeout(reconnectionTimeout);
+      
+      // Resolve the reconnection promise with true
+      this.reconnectionResolve(true);
+      this.currentReconnectionPromise.settled = true;
+      
+      return true;
     } catch (error) {
-      clearTimeout(reconnectionTimeout);
+      this.clearTrackedTimeout(reconnectionTimeout);
       
       // Don't log errors if page/context is closed (normal during cleanup)
       const isPageClosedError = error.message && (
@@ -233,16 +309,36 @@ export class WorkerService {
       
       if (isPageClosedError) {
         this.navLog('ℹ️ Reconnection cancelled due to page closure (normal during cleanup)');
+        this.reconnectionReject(new Error('Reconnection cancelled due to page closure'));
       } else {
         this.navLog('❌ Auto-reconnection failed: %O', error);
         console.error('❌ Worker auto-reconnection failed:', error);
         
-        // Signal reconnection failure
-        if (this.workerPage.onReconnectionFailure) {
-          this.workerPage.onReconnectionFailure(newUrl, error);
-        }
+        // Emit reconnection error event
+        this.emit('reconnection:error', {
+          newUrl,
+          oldUrl,
+          error: error.message,
+          pageName: this.workerPage ? this.workerPage.pageName : 'unknown',
+          timestamp: Date.now(),
+          duration: Date.now() - startTime,
+          isPageClosedError
+        });
+        
+        this.reconnectionReject(error);
       }
+      
+      this.currentReconnectionPromise.settled = true;
+      return false;
     }
+  }
+
+  /**
+   * Get the current reconnection promise
+   * @returns {Promise<boolean>|null} Promise that resolves with true if reconnection is successful, null if no reconnection in progress
+   */
+  getReconnectionPromise() {
+    return this.currentReconnectionPromise || Promise.resolve(true);
   }
 
   /**
@@ -270,6 +366,12 @@ export class WorkerService {
    * Clean up the service
    */
   cleanup() {
+    // Clear all active timers first
+    for (const timeoutId of this.activeTimers) {
+      clearTimeout(timeoutId);
+    }
+    this.activeTimers.clear();
+    
     this.disableUrlMonitoring();
     this.log('🧹 WorkerService cleaned up');
   }

@@ -54,7 +54,7 @@ class PlaywrightLauncher {
     
     // Create specialized services
     this.workerService = new WorkerService(this.workerPage);
-    this.pilotService = new PilotService(this.pilotPage, this.workerPage);
+    this.pilotService = new PilotService(this.pilotPage, this.workerPage, this.workerService);
     
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
 

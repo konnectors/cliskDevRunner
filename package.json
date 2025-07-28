@@ -15,11 +15,7 @@
     "test:full": "LOG_LEVEL=full node --test test/*.test.js",
     "test:normal": "LOG_LEVEL=normal node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js",
-    "test:verbose": "node --test --test-reporter=spec test/*.test.js",
-    "test:goto": "node --test --test-name-pattern=\"should use goto-konnector ensureAuthenticated\" test/*.test.js",
-    "test:ping": "node --test --test-name-pattern=\"should load handshake connector and call ping function\" test/*.test.js",
-    "test:multi": "node --test --test-name-pattern=\"should handle worker and pilot pages simultaneously\" test/*.test.js",
-    "test:worker-control": "node --test --test-name-pattern=\"should allow pilot to control worker URL\" test/*.test.js"
+    "test:verbose": "node --test --test-reporter=spec test/*.test.js"
   },
   "keywords": [
     "playwright",
