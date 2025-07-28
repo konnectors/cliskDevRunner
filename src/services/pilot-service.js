@@ -75,6 +75,14 @@ export class PilotService {
             throw error;
           }
         }, 'runInWorker');
+      },
+
+      blockWorkerInteractions: () => {
+        this.log('🚫 blockWorkerInteractions called');
+      },
+
+      unblockWorkerInteractions: () => {
+        this.log('✅ unblockWorkerInteractions called');
       }
     };
   }
@@ -92,7 +100,8 @@ export class PilotService {
     const { url } = state;
     
     if (!url) {
-      throw new Error('setWorkerState requires a url in the state object');
+      this.log('No url to set in worker state, canceling')
+      return
     }
     
     return await this.executeWithUrlChangeRetry(async () => {
@@ -291,6 +300,20 @@ export class PilotService {
         this.workerService.removeListener('reconnection:error', errorHandler);
       }, 30000);
     });
+  }
+
+  /**
+   * Block worker interaction
+   */
+  blockWorkerInteraction() {
+    this.log('🚫 blockWorkerInteraction called');
+  }
+
+  /**
+   * Unblock worker interaction
+   */
+  unblockWorkerInteraction() {
+    this.log('✅ unblockWorkerInteraction called');
   }
 
   /**
