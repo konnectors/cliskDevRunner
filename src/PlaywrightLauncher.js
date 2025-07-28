@@ -111,6 +111,14 @@ class PlaywrightLauncher {
       log('🔐 Calling ensureAuthenticated on pilot...');
       await pilotConnection.remoteHandle().call('ensureAuthenticated', {account: {}});
       log('✅ ensureAuthenticated completed successfully!');
+      log('🔐 Calling getUserDataFromWebsite on pilot...');
+      const userDataResult = await pilotConnection.remoteHandle().call('getUserDataFromWebsite');
+      log('✅ getUserDataFromWebsite result: %O', userDataResult);
+      if (!userDataResult?.sourceAccountIdentifier) {
+        throw new Error(
+          'getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.'
+        )
+      }
     } catch (error) {
       log('❌ Error during start: %O', error);
       throw error;
