@@ -5771,6 +5771,16 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
     await this.goto(baseUrl)
     return true
   }
+
+
+  async getUserDataFromWebsite() {
+    this.log('info', '🤖 getUserDataFromWebsite')
+    return {
+      sourceAccountIdentifier: 'defaultSourceAccountIdentifier'
+    }
+  }
+  async fetch(context) {
+  }
 }
 
 const connector = new TemplateContentScript()

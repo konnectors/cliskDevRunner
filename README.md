@@ -18,6 +18,8 @@ The goal is to allow developers to create clisk connectors with the lightest pos
 
 - **Configuration management** : Uses the `conf` library to manage settings with file-based configuration and command line overrides.
 
+- **Browser profiles** : Support for persistent browser profiles to maintain session data, cookies, and browser state across test runs. Each profile is isolated and can be used for different testing scenarios.
+
 ## Architecture
 
 The project uses a multi-page architecture with:
@@ -102,8 +104,52 @@ Configuration:
   - connector: Default connector to use
   - logLevel: Default log level
   - stayOpen: Default stay-open behavior
+  - profile: Default profile to use
   - browser: Browser launch options
   - mobile: Mobile simulation settings
+
+## Browser Profiles
+
+CliskDevRunner supports browser profiles to maintain persistent browser state across test runs. Each profile maintains its own:
+
+- Cookies and session data
+- Browser history
+- Saved passwords
+- Extensions and settings
+
+### Using Profiles
+
+```bash
+# Use a specific profile
+node src/index.js --profile mobile examples/evaluate-konnector
+
+# Use profile with other options
+node src/index.js --profile desktop --stay-open examples/goto-konnector
+
+# Use profile with log level
+node src/index.js --profile test --log-level full examples/minimal-konnector
+```
+
+### Profile Configuration
+
+You can set a default profile in your `config.json`:
+
+```json
+{
+  "profile": "mobile",
+  "connector": "examples/evaluate-konnector",
+  "logLevel": "normal"
+}
+```
+
+### Profile Management
+
+- Profiles are created automatically when first used
+- Each profile is stored in `./profile/{profile-name}/`
+- Profiles are completely isolated from each other
+- The `profile/` directory is ignored by Git
+
+**📖 See [PROFILES.md](PROFILES.md) for detailed documentation on browser profiles.**
 
 ## Command Line Interface
 
@@ -138,6 +184,10 @@ node src/index.js examples/evaluate-konnector
 
 # Connector path
 -c, --connector <path>      Specify connector path
+
+# Browser profile
+-p, --profile <name>        Specify a profile to use (e.g., "mobile", "desktop")
+                            Profiles are stored in ./profile directory
 ```
 
 ### Examples
@@ -152,8 +202,14 @@ node src/index.js -l quiet examples/minimal-konnector
 # Keep browser open for inspection
 node src/index.js --stay-open examples/evaluate-konnector
 
+# Use a specific profile
+node src/index.js --profile mobile examples/evaluate-konnector
+
 # Combine options
 node src/index.js --stay-open --log-level extreme examples/goto-konnector
+
+# Use profile with other options
+node src/index.js --profile desktop --stay-open examples/goto-konnector
 ```
 
 ### Environment Variables

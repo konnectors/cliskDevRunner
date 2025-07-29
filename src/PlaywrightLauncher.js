@@ -19,34 +19,67 @@ class PlaywrightLauncher {
     this.isInitialized = false;
   }
 
-  async init(connectorPath = 'examples/evaluate-konnector') {
+  async init(connectorPath = 'examples/evaluate-konnector', options = {}) {
     log('🚀 Initializing PlaywrightLauncher...');
     log(`📁 Using connector: ${connectorPath}`);
     
     this.connectorPath = connectorPath;
     
-    // Launch browser with mobile simulation
-    this.browser = await chromium.launch({ 
-      headless: false,
-      args: ['--no-sandbox', '--disable-web-security']
-    });
+    // Get configuration options
+    const { profile, browser: browserConfig, mobile: mobileConfig } = options;
+    
+    // Determine user data directory based on profile
+    let userDataDir = null;
+    if (profile) {
+      const path = await import('path');
+      const fs = await import('fs');
+      const profileDir = path.join(process.cwd(), 'profile', profile);
+      
+      // Create profile directory if it doesn't exist
+      if (!fs.existsSync(profileDir)) {
+        fs.mkdirSync(profileDir, { recursive: true });
+        log(`📁 Created profile directory: ${profileDir}`);
+      }
+      
+      userDataDir = profileDir;
+      log(`👤 Using browser profile: ${profile} (${profileDir})`);
+    }
+    
+    // Launch browser with configuration
+    const launchOptions = {
+      headless: browserConfig?.headless ?? false,
+      args: browserConfig?.args ?? ['--no-sandbox', '--disable-web-security']
+    };
     
     // Create browser context with mobile simulation
-    this.context = await this.browser.newContext({
+    const contextOptions = {
       // Simulate iPhone 12 mobile environment
-      hasTouch: true,
-      isMobile: true,
-      locale: 'fr-FR',
-      timezoneId: 'Europe/Paris',
+      hasTouch: mobileConfig?.hasTouch ?? true,
+      isMobile: mobileConfig?.isMobile ?? true,
+      locale: mobileConfig?.locale ?? 'fr-FR',
+      timezoneId: mobileConfig?.timezoneId ?? 'Europe/Paris',
       permissions: ['geolocation'],
-      viewport: { width: 390, height: 844 },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
-      deviceScaleFactor: 3,
+      viewport: mobileConfig?.viewport ?? { width: 390, height: 844 },
+      userAgent: mobileConfig?.userAgent ?? 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+      deviceScaleFactor: mobileConfig?.deviceScaleFactor ?? 3,
       javaScriptEnabled: true,
       bypassCSP: false,
-      geolocation: { longitude: -74.006, latitude: 40.7128 },
+      geolocation: mobileConfig?.geolocation ?? { longitude: -74.006, latitude: 40.7128 },
       colorScheme: 'light'
-    });
+    };
+    
+    if (userDataDir) {
+      // Use launchPersistentContext for profiles
+      this.context = await chromium.launchPersistentContext(userDataDir, {
+        ...launchOptions,
+        ...contextOptions
+      });
+      this.browser = this.context.browser();
+    } else {
+      // Use regular launch for no profile
+      this.browser = await chromium.launch(launchOptions);
+      this.context = await this.browser.newContext(contextOptions);
+    }
 
     // Create CliskPage instances for pilot and worker
     this.workerPage = new CliskPage(this.context, 'worker');

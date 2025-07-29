@@ -2,12 +2,10 @@
   "connector": "examples/evaluate-konnector",
   "logLevel": "normal",
   "stayOpen": false,
+  "profile": "mobile",
   "browser": {
     "headless": false,
-    "args": [
-      "--no-sandbox",
-      "--disable-web-security"
-    ]
+    "args": ["--no-sandbox", "--disable-web-security"]
   },
   "mobile": {
     "hasTouch": true,

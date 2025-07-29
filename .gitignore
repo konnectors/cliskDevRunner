@@ -81,6 +81,9 @@ config.json
 # data
 data/
 
+# Browser profiles
+profile/
+
 # IDE files
 .vscode/
 .idea/
