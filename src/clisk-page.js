@@ -59,105 +59,6 @@ export class CliskPage extends EventEmitter {
   }
 
   /**
-   * Check if a URL change with handshake is currently in progress
-   * @returns {boolean} - True if a URL change with handshake is in progress
-   */
-  hasUrlChangeWithHandshakeInProgress() {
-    return this.isUrlChangeWithHandshakeInProgress;
-  }
-
-  /**
-   * Check if navigation is currently in progress
-   * @returns {boolean} - True if navigation is in progress
-   */
-  hasNavigationInProgress() {
-    return this.isNavigationInProgress;
-  }
-
-  /**
-   * Check if handshake is currently in progress
-   * @returns {boolean} - True if handshake is in progress
-   */
-  hasHandshakeInProgress() {
-    return this.isHandshakeInProgress;
-  }
-
-  /**
-   * Get the current state of the page
-   * @returns {Object} - Object containing all state information
-   */
-  getState() {
-    return {
-      isInitialized: this.isInitialized,
-      isNavigationInProgress: this.isNavigationInProgress,
-      isHandshakeInProgress: this.isHandshakeInProgress,
-      isUrlChangeWithHandshakeInProgress: this.isUrlChangeWithHandshakeInProgress,
-      currentUrl: this.page ? this.page.url() : null,
-      currentNavigationUrl: this.currentNavigationUrl,
-      navigationStartTime: this.navigationStartTime,
-      handshakeStartTime: this.handshakeStartTime,
-      hasConnection: !!this.connection,
-      pageName: this.pageName
-    };
-  }
-
-  /**
-   * Get timing information for current operations
-   * @returns {Object} - Object containing timing information
-   */
-  getTimingInfo() {
-    const now = Date.now();
-    return {
-      currentTime: now,
-      navigationDuration: this.navigationStartTime ? now - this.navigationStartTime : null,
-      handshakeDuration: this.handshakeStartTime ? now - this.handshakeStartTime : null,
-      navigationStartTime: this.navigationStartTime,
-      handshakeStartTime: this.handshakeStartTime,
-      isNavigationInProgress: this.isNavigationInProgress,
-      isHandshakeInProgress: this.isHandshakeInProgress,
-      isUrlChangeWithHandshakeInProgress: this.isUrlChangeWithHandshakeInProgress
-    };
-  }
-
-  /**
-   * Navigate to a URL with automatic handshake
-   * @param {string} url - URL to navigate to
-   * @param {Object} handshakeOptions - Options for the handshake
-   * @param {string} contentScriptType - Content script type for handshake
-   * @returns {Object} - The established connection
-   */
-  async navigateWithHandshake(url, handshakeOptions = {}, contentScriptType = null) {
-    if (!this.isInitialized) {
-      throw new Error('Page must be initialized before navigation with handshake');
-    }
-
-    this.log('🔄 Starting URL change with handshake to: %s', url);
-    
-    // Set state flags
-    this.isUrlChangeWithHandshakeInProgress = true;
-    this.currentNavigationUrl = url;
-    
-    try {
-      // Navigate to the URL
-      await this.navigate(url);
-      
-      // Initiate handshake
-      const connection = await this.initiateHandshake(handshakeOptions, contentScriptType);
-      
-      this.log('✅ URL change with handshake completed successfully');
-      return connection;
-      
-    } catch (error) {
-      this.log('❌ URL change with handshake failed: %O', error);
-      throw error;
-    } finally {
-      // Reset state flags
-      this.isUrlChangeWithHandshakeInProgress = false;
-      this.currentNavigationUrl = null;
-    }
-  }
-
-  /**
    * Initialize the page and setup basic configuration
    */
   async init() {
@@ -565,6 +466,4 @@ export class CliskPage extends EventEmitter {
     // Merge with additional methods provided by services
     return { ...baseMethods, ...this.additionalLocalMethods };
   }
-
-
 } 
