@@ -5884,7 +5884,7 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
       amount: normalizePrice(article.querySelector('.price_color')?.innerHTML),
       date: '2024-01-01', // use a fixed date to avoid the multiplication of bills
       vendor: 'template',
-      filename: article.querySelector('h3 a')?.getAttribute('title'),
+      filename: article.querySelector('h3 a')?.getAttribute('title') + '.jpg',
       fileurl:
         'https://books.toscrape.com/' +
         article.querySelector('img')?.getAttribute('src')

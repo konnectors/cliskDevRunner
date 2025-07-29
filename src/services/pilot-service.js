@@ -1,4 +1,6 @@
 import debug from 'debug';
+const fs = await import('node:fs/promises');
+const path = await import('node:path');
 
 /**
  * PilotService - Gère la logique spécifique au pilot
@@ -83,6 +85,45 @@ export class PilotService {
 
       unblockWorkerInteractions: () => {
         this.log('✅ unblockWorkerInteractions called');
+      },
+
+      saveIdentity: async (contact) => {
+        this.log('💾 saveIdentity called: %O', contact);
+      },
+
+      saveBills: async (entries) => {
+        this.log('💾 saveBills called: %O', entries);
+      },
+
+      saveFiles: async (entries) => {
+        this.log('💾 saveFiles called');
+        await this.waitForReconnectionIfInProgress();
+        const workerConnection = this.workerPage.getConnection();
+        if (!workerConnection) {
+          throw new Error('Worker connection not available.');
+        }
+
+        await fs.mkdir('./data', { recursive: true });
+        for (const entry of entries) {
+          // Call the specified method on the worker with the provided arguments
+          let dataUri;
+          try {
+            dataUri = await workerConnection.remoteHandle().call('downloadFileInWorker', entry);
+
+            const base64Data = dataUri.split(',')[1];
+            const fileData = Buffer.from(base64Data, 'base64');
+            
+            await fs.writeFile(path.join('./data', entry.filename + ''), fileData);
+            this.log('✅ File saved successfully to ./data/' + entry.filename);
+          } catch (error) {
+            // Check if it's an execution context destroyed error
+            if (error.message && error.message.includes('Execution context was destroyed')) {
+              this.log('⚠️ Execution context destroyed during runInWorker, treating as URL change');
+              throw new Error('URL_CHANGE_DETECTED: Execution context was destroyed');
+            }
+            throw error;
+          }
+        }
       }
     };
   }

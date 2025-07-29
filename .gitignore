@@ -78,6 +78,9 @@ typings/
 # Configuration files
 config.json
 
+# data
+data/
+
 # IDE files
 .vscode/
 .idea/

@@ -119,6 +119,9 @@ class PlaywrightLauncher {
           'getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.'
         )
       }
+      log('🔐 Calling fetch on pilot...');
+      await pilotConnection.remoteHandle().call('fetch', {});
+      log('✅  fetch completed successfully!');
     } catch (error) {
       log('❌ Error during start: %O', error);
       throw error;
