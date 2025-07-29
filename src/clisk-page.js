@@ -291,7 +291,6 @@ export class CliskPage extends EventEmitter {
       
       this.commLog('✅ Post-me handshake successful!');
       
-      this.commLog('🎯 Post-me connection fully established!');
       
       // Set content script type if provided
       if (contentScriptType) {
@@ -450,8 +449,6 @@ export class CliskPage extends EventEmitter {
   async injectPageScript() {
     // Inject page-specific initialization script
     const initScript = `
-      console.log('[DEBUG] Init script starting for ${this.pageName}');
-      
       // Create page-specific logger
       const pageLogger = {
         log: function(...args) {
@@ -466,18 +463,11 @@ export class CliskPage extends EventEmitter {
         }
       };
       
-      // Test if functions are available
-      console.log('[DEBUG] Checking functions for ${this.pageName}');
-      console.log('[DEBUG] sendToPlaywright available:', typeof window.sendToPlaywright);
-      console.log('[DEBUG] sendPageLog available:', typeof window.sendPageLog);
-      
       // Create ReactNativeWebView object if it doesn't exist
       window.ReactNativeWebView = window.ReactNativeWebView || {};
       
       // Setup postMessage function that bridges to the host
       window.ReactNativeWebView.postMessage = function(message) {
-        pageLogger.log('📤 [${this.pageName}] ReactNativeWebView posting:', message);
-        
         // Parse message if it's a string
         let parsedMessage;
         try {
@@ -489,7 +479,6 @@ export class CliskPage extends EventEmitter {
         
         // Forward post-me messages to Playwright
         if (parsedMessage.type === '@post-me') {
-          pageLogger.log('🔄 [${this.pageName}→Playwright] Forwarding:', parsedMessage);
           if (window.sendToPlaywright) {
             window.sendToPlaywright(parsedMessage);
           } else {
@@ -501,15 +490,7 @@ export class CliskPage extends EventEmitter {
         }
       };
       
-      // Setup message listener for messages FROM Playwright TO the connector
-      window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === '@post-me') {
-          pageLogger.log('📥 [Playwright→${this.pageName}] Received:', event.data);
-        }
-      });
-      
       pageLogger.log('✅ [${this.pageName}] ReactNativeWebView and post-me bridge ready');
-      console.log('[DEBUG] Init script completed for ${this.pageName}');
     `;
     
     await this.page.addInitScript(initScript);
@@ -525,7 +506,7 @@ export class CliskPage extends EventEmitter {
   createMessenger() {
     return {
       postMessage: async (message, transfer) => {
-        this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
+        // this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
         
         try {
           await this.page.evaluate((msg) => {
@@ -545,7 +526,7 @@ export class CliskPage extends EventEmitter {
         
         // Store the listener for this page instance
         this.messageHandler = (data) => {
-          this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
+          // this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
           listener({ data });
         };
         
@@ -579,39 +560,6 @@ export class CliskPage extends EventEmitter {
         return `pong from ${this.pageName}`;
       },
       
-      // Method to log messages
-      log: (message) => {
-        this.commLog('📝 [%s] Connector says: %s', this.pageName, message);
-      },
-      
-      // Method to get page info
-      getPageInfo: () => {
-        this.commLog('ℹ️ [%s] Page info requested', this.pageName);
-        return { 
-          pageName: this.pageName, 
-          timestamp: Date.now(),
-          status: 'ready'
-        };
-      },
-      
-      // Method to simulate a response
-      simulateResponse: (data) => {
-        this.commLog('🎭 [%s] Simulating response for: %O', this.pageName, data);
-        return { 
-          success: true, 
-          timestamp: Date.now(), 
-          echo: data,
-          pageName: this.pageName
-        };
-      },
-
-      // Method to set content script type (required by cozy-clisk connectors)
-      setContentScriptType: (contentScriptType) => {
-        this.commLog('🏷️ [%s] setContentScriptType called with: %s', this.pageName, contentScriptType);
-        // Store the content script type
-        this.contentScriptType = contentScriptType;
-        return true;
-      }
     };
 
     // Merge with additional methods provided by services
