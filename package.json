@@ -31,6 +31,7 @@
   "license": "MIT",
   "dependencies": {
     "conf": "^14.0.0",
+    "cozy-client": "^60.1.1",
     "debug": "^4.4.1",
     "express": "^4.19.2",
     "express-session": "^1.17.3",
