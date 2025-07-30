@@ -5,6 +5,15 @@ import { CliskPage } from "./clisk-page.js";
 import { PilotService } from "./services/pilot-service.js";
 import { WorkerService } from "./services/worker-service.js";
 
+// Common JS-compatible import
+import pkg from "cozy-client";
+const { default: CozyClient } = pkg;
+
+// import credentials file for token access
+import fs from "fs";
+import path from "path";
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 const log = getLogger("clisk:launcher:playwright");
 
 class PlaywrightLauncher {
@@ -26,7 +35,39 @@ class PlaywrightLauncher {
     this.connectorPath = connectorPath;
 
     // Get configuration options
-    const { profile, browser: browserConfig, mobile: mobileConfig } = options;
+    const {
+      profile,
+      browser: browserConfig,
+      mobile: mobileConfig,
+      targetedInstance,
+    } = options;
+
+    /* TO COMMENT IF YOU DONT NEED TO READ CREDENTIALS FROM FILE */
+    let credentials;
+    const credPath = path.join(__dirname, "../data/credentials.json");
+
+    if (fs.existsSync(credPath)) {
+      try {
+        const raw = fs.readFileSync(credPath, "utf-8");
+        credentials = JSON.parse(raw);
+
+        if (!credentials) {
+          log('⚠️ credentials.json exists but no "token" key found.');
+        } else {
+          log("🔐 Token loaded from credentials.json");
+        }
+      } catch (err) {
+        log(`❌ Failed to read credentials.json: ${err.message}`);
+      }
+    } else {
+      log("⚠️ No credentials.json file found.");
+    }
+    //////////////////////////////////////////////////////
+
+    this.cozyClient = await createCozyClient({
+      targetedInstance,
+      token: credentials.token,
+    });
 
     // Determine user data directory based on profile
     let userDataDir = null;
@@ -255,6 +296,29 @@ class PlaywrightLauncher {
       this.workerService
     );
   }
+}
+
+async function createCozyClient({ targetedInstance, token }) {
+  log("🔨  Creation of the a new client ...");
+  const client = new CozyClient({
+    uri: `http://${targetedInstance}`,
+    schema: {
+      files: {
+        doctype: "io.cozy.files",
+      },
+    },
+    token,
+  });
+
+  const files = await client.collection("io.cozy.files").all();
+  if (files) {
+    log("✅  Client succesfully created");
+  } else {
+    throw new Error(
+      "❌  Something went wrong when trying to create new client"
+    );
+  }
+  return client;
 }
 
 export default PlaywrightLauncher;

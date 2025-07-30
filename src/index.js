@@ -227,6 +227,7 @@ async function main() {
       profile: profile,
       browser: config.get("browser"),
       mobile: config.get("mobile"),
+      targetedInstance: targetedInstance,
     });
     await launcher.start();
 
