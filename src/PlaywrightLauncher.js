@@ -9,10 +9,11 @@ import { WorkerService } from "./services/worker-service.js";
 import pkg from "cozy-client";
 const { default: CozyClient } = pkg;
 
-// import credentials file for token access
 import fs from "fs";
 import path from "path";
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
+// import credentials path for token access
+const CREDENTIALS_PATH = path.join(__dirname, "../data/credentials.json");
 
 const log = getLogger("clisk:launcher:playwright");
 
@@ -42,13 +43,14 @@ class PlaywrightLauncher {
       targetedInstance,
     } = options;
 
-    /* TO COMMENT IF YOU DONT NEED TO READ CREDENTIALS FROM FILE */
-    let credentials;
-    const credPath = path.join(__dirname, "../data/credentials.json");
+    await saveCredentials({ login: "bilbothehobbit", password: "theshire" });
 
-    if (fs.existsSync(credPath)) {
+    /* TO REMOVE ONCE GETCREDENTIALS HAS BEEN IMPLEMENTED */
+    let credentials;
+
+    if (fs.existsSync(CREDENTIALS_PATH)) {
       try {
-        const raw = fs.readFileSync(credPath, "utf-8");
+        const raw = fs.readFileSync(CREDENTIALS_PATH, "utf-8");
         credentials = JSON.parse(raw);
 
         if (!credentials) {
@@ -62,7 +64,7 @@ class PlaywrightLauncher {
     } else {
       log("⚠️ No credentials.json file found.");
     }
-    //////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////// */
 
     this.cozyClient = await createCozyClient({
       targetedInstance,
@@ -319,6 +321,35 @@ async function createCozyClient({ targetedInstance, token }) {
     );
   }
   return client;
+}
+
+async function saveCredentials(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("saveCredentials argument must be an object");
+  }
+  let existing = {};
+  if (fs.existsSync(CREDENTIALS_PATH)) {
+    try {
+      const raw = await fs.promises.readFile(CREDENTIALS_PATH, "utf-8");
+      existing = JSON.parse(raw);
+    } catch (err) {
+      log("Could not read existing credentials, starting fresh.");
+    }
+  }
+
+  const merged = { ...existing, ...data };
+
+  try {
+    await fs.promises.writeFile(
+      CREDENTIALS_PATH,
+      JSON.stringify(merged, null, 2),
+      "utf-8"
+    );
+    log("Credentials updated.");
+  } catch (err) {
+    log("Failed to write credentials file:", err.message);
+    throw err;
+  }
 }
 
 export default PlaywrightLauncher;
