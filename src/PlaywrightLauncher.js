@@ -34,6 +34,7 @@ class PlaywrightLauncher {
     log(`📁 Using connector: ${connectorPath}`);
 
     this.connectorPath = connectorPath;
+    let credentials;
 
     // Get configuration options
     const {
@@ -43,28 +44,7 @@ class PlaywrightLauncher {
       targetedInstance,
     } = options;
 
-    await saveCredentials({ login: "bilbothehobbit", password: "theshire" });
-
-    /* TO REMOVE ONCE GETCREDENTIALS HAS BEEN IMPLEMENTED */
-    let credentials;
-
-    if (fs.existsSync(CREDENTIALS_PATH)) {
-      try {
-        const raw = fs.readFileSync(CREDENTIALS_PATH, "utf-8");
-        credentials = JSON.parse(raw);
-
-        if (!credentials) {
-          log('⚠️ credentials.json exists but no "token" key found.');
-        } else {
-          log("🔐 Token loaded from credentials.json");
-        }
-      } catch (err) {
-        log(`❌ Failed to read credentials.json: ${err.message}`);
-      }
-    } else {
-      log("⚠️ No credentials.json file found.");
-    }
-    ////////////////////////////////////////////////////// */
+    credentials = await getCredentials();
 
     this.cozyClient = await createCozyClient({
       targetedInstance,
@@ -348,6 +328,22 @@ async function saveCredentials(data) {
     log("Credentials updated.");
   } catch (err) {
     log("Failed to write credentials file:", err.message);
+    throw err;
+  }
+}
+
+async function getCredentials() {
+  if (!fs.existsSync(CREDENTIALS_PATH)) {
+    log("⚠️  No credentials file found, please create it");
+    return null;
+  }
+
+  try {
+    const content = await fs.promises.readFile(CREDENTIALS_PATH, "utf-8");
+    const data = JSON.parse(content);
+    return data;
+  } catch (err) {
+    log("❌  Something went wrong when reading credentials file", err.message);
     throw err;
   }
 }
