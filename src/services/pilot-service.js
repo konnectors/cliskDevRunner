@@ -1,6 +1,10 @@
 import debug from "debug";
 const fs = await import("node:fs/promises");
 const path = await import("node:path");
+const CREDENTIALS_PATH = path.join(
+  path.dirname(new URL(import.meta.url).pathname),
+  "../../data/credentials.json"
+);
 
 /**
  * PilotService - Gère la logique spécifique au pilot
@@ -144,6 +148,58 @@ export class PilotService {
             }
             throw error;
           }
+        }
+      },
+
+      getCredentials: async () => {
+        try {
+          await fs.access(CREDENTIALS_PATH);
+        } catch (err) {
+          log("⚠️  No credentials file found, please create it");
+          return null;
+        }
+
+        try {
+          const content = await fs.readFile(CREDENTIALS_PATH, "utf-8");
+          const data = JSON.parse(content);
+          return data;
+        } catch (err) {
+          log(
+            "❌  Something went wrong when reading credentials file",
+            err.message
+          );
+          throw err;
+        }
+      },
+
+      saveCredentials: async (newCredentials) => {
+        let currentData = {};
+        try {
+          const content = await fs.readFile(CREDENTIALS_PATH, "utf-8");
+          currentData = JSON.parse(content);
+        } catch (err) {
+          if (err.code !== "ENOENT") {
+            this.log(
+              "❌  Error reading credentials before saving",
+              err.message
+            );
+            throw err;
+          }
+          this.log("ℹ️  No existing credentials file, creating a new one");
+        }
+
+        const merged = { ...currentData, ...newCredentials };
+
+        try {
+          await fs.writeFile(
+            CREDENTIALS_PATH,
+            JSON.stringify(merged, null, 2),
+            "utf-8"
+          );
+          this.log("✅  Credentials saved successfully");
+        } catch (err) {
+          this.log("❌  Error saving credentials", err.message);
+          throw err;
         }
       },
     };
