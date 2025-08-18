@@ -5,11 +5,13 @@
 
 import { ParentHandshake } from 'post-me';
 import debug from 'debug';
+import { EventEmitter } from 'events';
 
 /**
  * CliskPage class - manages a single page with isolated communication and logging
+ * Extends EventEmitter to provide event-driven architecture
  */
-export class CliskPage {
+export class CliskPage extends EventEmitter {
   /**
    * Create a new CliskPage instance
    * @param {Object} context - Browser context from Playwright
@@ -17,6 +19,8 @@ export class CliskPage {
    * @param {Object} options - Configuration options
    */
   constructor(context, pageName, options = {}) {
+    super(); // Call EventEmitter constructor
+    
     this.context = context;
     this.pageName = pageName;
     this.options = {
@@ -30,7 +34,6 @@ export class CliskPage {
     this.pageLog = debug(`clisk:${pageName}:page`);
     this.messageLog = debug(`clisk:${pageName}:message`);
     this.commLog = debug(`clisk:${pageName}:comm`);
-    this.navLog = debug(`clisk:${pageName}:nav`);
     
     // Instance variables for isolated state
     this.page = null;
@@ -39,17 +42,20 @@ export class CliskPage {
     this.isInitialized = false;
     this.functionsExposed = false; // Track if functions have been exposed
     
-    // Auto-reconnection state
+    // State tracking for URL changes and handshakes
+    this.isNavigationInProgress = false;
+    this.isHandshakeInProgress = false;
+    this.isUrlChangeWithHandshakeInProgress = false;
+    this.currentNavigationUrl = null;
+    this.navigationStartTime = null;
+    this.handshakeStartTime = null;
+    
+    // Connector state for potential reconnection
     this.connectorPath = null;
     this.loaderFunction = null;
-    this.isAutoReconnectEnabled = false;
-    this.currentUrl = null;
     
-    // Inter-page communication
-    this.workerReference = null;
-    this.reconnectionPromises = new Map(); // Track pending reconnection promises
-    this.onReconnectionComplete = null; // Callback for successful reconnection
-    this.onReconnectionFailure = null; // Callback for failed reconnection
+    // Additional local methods (can be extended by services)
+    this.additionalLocalMethods = {};
   }
 
   /**
@@ -82,20 +88,36 @@ export class CliskPage {
       throw new Error('Page must be initialized before navigation');
     }
     
-    this.log('🌐 Navigating to: %s', url);
-    await this.page.goto(url);
+    // Set navigation state
+    this.isNavigationInProgress = true;
+    this.currentNavigationUrl = url;
+    this.navigationStartTime = Date.now();
     
-    // Wait a bit for the page to be ready and scripts to execute
-    await this.page.waitForTimeout(500);
+    try {
+      this.log('🌐 Navigating to: %s', url);
+      await this.page.goto(url);
+      
+      // Wait a bit for the page to be ready and scripts to execute
+      await this.page.waitForTimeout(500);
+      
+      this.log('✅ Navigation completed to: %s', url);
+    } catch (error) {
+      this.log('❌ Navigation failed to: %s - %O', url, error);
+      throw error;
+    } finally {
+      // Reset navigation state
+      this.isNavigationInProgress = false;
+      this.currentNavigationUrl = null;
+      this.navigationStartTime = null;
+    }
   }
 
   /**
    * Load and inject connector code
    * @param {string} connectorPath - Path to the connector directory
    * @param {Function} loaderFunction - Function to load the connector
-   * @param {boolean} enableAutoReconnect - Enable automatic reconnection on URL changes
    */
-  async loadConnector(connectorPath, loaderFunction, enableAutoReconnect = true) {
+  async loadConnector(connectorPath, loaderFunction) {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before loading connector');
     }
@@ -105,15 +127,9 @@ export class CliskPage {
     // Store connector details for potential reconnection
     this.connectorPath = connectorPath;
     this.loaderFunction = loaderFunction;
-    this.isAutoReconnectEnabled = enableAutoReconnect;
     
     const manifest = await loaderFunction(this.page, connectorPath);
     this.log('📋 Loaded: %s v%s', manifest.name, manifest.version);
-    
-    // Start monitoring URL changes if auto-reconnect is enabled
-    if (enableAutoReconnect) {
-      this.setupUrlChangeMonitoring();
-    }
     
     return manifest;
   }
@@ -121,8 +137,9 @@ export class CliskPage {
   /**
    * Initiate post-me handshake
    * @param {Object} options - Handshake options
+   * @param {string} contentScriptType - Content script type (pilot or worker), optional
    */
-  async initiateHandshake(options = {}) {
+  async initiateHandshake(options = {}, contentScriptType = null) {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before handshake');
     }
@@ -133,15 +150,35 @@ export class CliskPage {
       waitTime = 3000
     } = options;
 
+    // Set handshake state
+    this.isHandshakeInProgress = true;
+    this.handshakeStartTime = Date.now();
+
     this.commLog('🤝 Initiating post-me handshake...');
     
     const messenger = this.createMessenger();
     const localMethods = this.getLocalMethods();
+    
+    // Debug: log available methods
+    this.commLog('🔍 [%s] Available local methods: %O', this.pageName, Object.keys(localMethods));
 
     try {
       // Wait for connector to be ready
       this.commLog('⏳ Waiting for connector to initialize...');
-      await this.page.waitForTimeout(waitTime);
+      
+      // Check if page is still valid before waiting
+      if (!this.page || this.page.isClosed()) {
+        throw new Error('Page was closed before handshake could complete');
+      }
+      
+      try {
+        await this.page.waitForTimeout(waitTime);
+      } catch (error) {
+        if (error.message.includes('Target page, context or browser has been closed')) {
+          throw new Error('Page was closed during handshake initialization');
+        }
+        throw error;
+      }
       
       // Initiate handshake
       this.commLog('🚀 Starting ParentHandshake...');
@@ -155,29 +192,44 @@ export class CliskPage {
       
       this.commLog('✅ Post-me handshake successful!');
       
-      // Emit ready event
-      this.connection.localHandle().emit('playwright-ready', { 
-        message: `Playwright page ${this.pageName} is ready!`,
-        timestamp: Date.now(),
-        pageName: this.pageName
-      });
       
-      this.commLog('🎯 Post-me connection fully established!');
-      
-      // Automatically set the content script type (required by cozy-clisk connectors)
-      try {
-        const scriptType = this.pageName === 'pilot' ? 'pilot' : 'worker';
-        await this.connection.remoteHandle().call('setContentScriptType', scriptType);
-        this.commLog('🏷️ [%s] Content script type set to: %s', this.pageName, scriptType);
-      } catch (error) {
-        this.commLog('⚠️ [%s] Failed to set content script type: %O', this.pageName, error);
+      // Set content script type if provided
+      if (contentScriptType) {
+        try {
+          await this.connection.remoteHandle().call('setContentScriptType', contentScriptType);
+          this.commLog('🏷️ [%s] Content script type set to: %s', this.pageName, contentScriptType);
+        } catch (error) {
+          this.commLog('⚠️ [%s] Failed to set content script type: %O', this.pageName, error);
+        }
       }
+
+      // Emit handshake success event
+      this.emit('connection:success', { 
+        pageName: this.pageName, 
+        connection: this.connection,
+        url: this.page.url(),
+        timestamp: Date.now(),
+        duration: Date.now() - this.handshakeStartTime
+      });
       
       return this.connection;
       
     } catch (error) {
-      console.error(`❌ [${this.pageName}] Post-me handshake failed:`, error);
+      // Don't log errors if page is closed (normal during cleanup)
+      const isPageClosedError = error.message && (
+        error.message.includes('Target page, context or browser has been closed') ||
+        error.message.includes('Page was closed during handshake initialization') ||
+        error.message.includes('Page was closed before handshake could complete')
+      );
+      
+      if (!isPageClosedError) {
+        console.error(`❌ [${this.pageName}] Post-me handshake failed:`, error);
+      }
       throw error;
+    } finally {
+      // Reset handshake state
+      this.isHandshakeInProgress = false;
+      this.handshakeStartTime = null;
     }
   }
 
@@ -202,27 +254,6 @@ export class CliskPage {
     this.log('🛑 Closing page: %s', this.pageName);
     
     try {
-      // Cancel any pending URL change monitoring
-      if (this.urlChangeTimeout) {
-        clearTimeout(this.urlChangeTimeout);
-        this.urlChangeTimeout = null;
-      }
-      
-      // Cleanup any pending reconnection promises
-      if (this.reconnectionPromises) {
-        for (const [id, promise] of this.reconnectionPromises.entries()) {
-          if (promise.reject) {
-            promise.reject(new Error('Page closing'));
-          }
-        }
-        this.reconnectionPromises.clear();
-      }
-      
-      // Cleanup worker reference callbacks
-      if (this.workerReference) {
-        this.workerReference.onReconnectionComplete = null;
-      }
-      
       // Close post-me connection first
       if (this.connection) {
         try {
@@ -246,9 +277,17 @@ export class CliskPage {
       this.log('⚠️ Error during close: %O', error);
     }
     
-    // Cleanup message handler
+    // Cleanup message handler and state
     this.messageHandler = null;
     this.isInitialized = false;
+    
+    // Reset all state tracking flags
+    this.isNavigationInProgress = false;
+    this.isHandshakeInProgress = false;
+    this.isUrlChangeWithHandshakeInProgress = false;
+    this.currentNavigationUrl = null;
+    this.navigationStartTime = null;
+    this.handshakeStartTime = null;
     
     this.log('✅ Page closed: %s', this.pageName);
   }
@@ -311,8 +350,6 @@ export class CliskPage {
   async injectPageScript() {
     // Inject page-specific initialization script
     const initScript = `
-      console.log('[DEBUG] Init script starting for ${this.pageName}');
-      
       // Create page-specific logger
       const pageLogger = {
         log: function(...args) {
@@ -327,18 +364,11 @@ export class CliskPage {
         }
       };
       
-      // Test if functions are available
-      console.log('[DEBUG] Checking functions for ${this.pageName}');
-      console.log('[DEBUG] sendToPlaywright available:', typeof window.sendToPlaywright);
-      console.log('[DEBUG] sendPageLog available:', typeof window.sendPageLog);
-      
       // Create ReactNativeWebView object if it doesn't exist
       window.ReactNativeWebView = window.ReactNativeWebView || {};
       
       // Setup postMessage function that bridges to the host
       window.ReactNativeWebView.postMessage = function(message) {
-        pageLogger.log('📤 [${this.pageName}] ReactNativeWebView posting:', message);
-        
         // Parse message if it's a string
         let parsedMessage;
         try {
@@ -350,7 +380,6 @@ export class CliskPage {
         
         // Forward post-me messages to Playwright
         if (parsedMessage.type === '@post-me') {
-          pageLogger.log('🔄 [${this.pageName}→Playwright] Forwarding:', parsedMessage);
           if (window.sendToPlaywright) {
             window.sendToPlaywright(parsedMessage);
           } else {
@@ -362,188 +391,14 @@ export class CliskPage {
         }
       };
       
-      // Setup message listener for messages FROM Playwright TO the connector
-      window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === '@post-me') {
-          pageLogger.log('📥 [Playwright→${this.pageName}] Received:', event.data);
-        }
-      });
-      
       pageLogger.log('✅ [${this.pageName}] ReactNativeWebView and post-me bridge ready');
-      console.log('[DEBUG] Init script completed for ${this.pageName}');
     `;
     
     await this.page.addInitScript(initScript);
     this.commLog('🔧 Setup script injected for %s', this.pageName);
   }
 
-  /**
-   * Setup URL change monitoring for automatic reconnection
-   * @private
-   */
-  setupUrlChangeMonitoring() {
-    if (!this.page) return;
-    
-    this.navLog('🔍 Setting up URL change monitoring for %s...', this.pageName);
-    
-    // Listen for URL changes (navigation events)
-    this.page.on('framenavigated', async (frame) => {
-      // Only handle main frame navigation
-      if (frame !== this.page.mainFrame()) return;
-      
-      const newUrl = frame.url();
-      const oldUrl = this.currentUrl;
-      
-      // Skip if it's the same URL or initial navigation
-      if (!oldUrl || newUrl === oldUrl) {
-        this.currentUrl = newUrl;
-        return;
-      }
-      
-      this.navLog('🌍 [%s] URL changed: %s → %s', this.pageName, oldUrl, newUrl);
-      this.currentUrl = newUrl;
-      
-      // Skip about:blank navigations (common during testing)
-      if (newUrl === 'about:blank') {
-        this.navLog('⏭️ [%s] Skipping about:blank navigation', this.pageName);
-        return;
-      }
-      
-      // Trigger reconnection
-      await this.handleUrlChange(newUrl, oldUrl);
-    });
-    
-    // Track initial URL
-    this.currentUrl = this.page.url();
-    this.navLog('📍 [%s] Initial URL: %s', this.pageName, this.currentUrl);
-  }
 
-  /**
-   * Handle URL change and attempt reconnection
-   * @param {string} newUrl - New URL
-   * @param {string} oldUrl - Previous URL
-   * @private
-   */
-  async handleUrlChange(newUrl, oldUrl) {
-    if (!this.isAutoReconnectEnabled || !this.connectorPath || !this.loaderFunction) {
-      this.navLog('⚠️ [%s] Auto-reconnect not configured, skipping', this.pageName);
-      return;
-    }
-    
-    // Check if page is still valid
-    if (!this.page || this.page.isClosed()) {
-      this.navLog('⚠️ [%s] Page is closed, skipping auto-reconnection', this.pageName);
-      return;
-    }
-    
-    try {
-      this.navLog('🔄 [%s] Starting auto-reconnection process...', this.pageName);
-      
-      // Close existing connection if any
-      if (this.connection) {
-        this.navLog('🔌 [%s] Closing existing connection...', this.pageName);
-        this.connection.close();
-        this.connection = null;
-      }
-      
-      // Check again if page is still valid after closing connection
-      if (!this.page || this.page.isClosed()) {
-        this.navLog('⚠️ [%s] Page was closed during reconnection, aborting', this.pageName);
-        return;
-      }
-      
-      // Wait a bit for the new page to load
-      this.navLog('⏳ [%s] Waiting for page to stabilize...', this.pageName);
-      await this.page.waitForTimeout(1000);
-      
-      // Re-setup communication bridge WITHOUT exposing functions again
-      // (functions persist at the context level, we just need to re-inject the page script)
-      this.navLog('🔗 [%s] Re-setting up communication bridge...', this.pageName);
-      await this.setupPostMeCommunication(false); // Don't expose functions again
-      
-      // Re-inject connector on the new page
-      this.navLog('📦 [%s] Re-injecting connector...', this.pageName);
-      await this.loaderFunction(this.page, this.connectorPath);
-      
-      // Re-establish handshake
-      this.navLog('🤝 [%s] Re-establishing handshake...', this.pageName);
-      const messenger = this.createMessenger();
-      const localMethods = this.getLocalMethods();
-      
-      this.connection = await ParentHandshake(
-        messenger,
-        localMethods,
-        10, // maxAttempts
-        1000 // attemptInterval
-      );
-      
-      // Setup event listeners
-      this.connection.remoteHandle().addEventListener('test-event', (data) => {
-        this.commLog('🎊 Received event from reconnected connector: %O', data);
-      });
-      
-      // Emit ready event
-      this.connection.localHandle().emit('playwright-ready', { 
-        message: `Playwright page ${this.pageName} reconnected!`,
-        timestamp: Date.now(),
-        pageName: this.pageName,
-        newUrl,
-        oldUrl
-      });
-      
-      // Re-set content script type after reconnection (required by cozy-clisk connectors)
-      try {
-        const scriptType = this.pageName === 'pilot' ? 'pilot' : 'worker';
-        await this.connection.remoteHandle().call('setContentScriptType', scriptType);
-        this.navLog('🏷️ [%s] Content script type re-set to: %s after reconnection', this.pageName, scriptType);
-      } catch (error) {
-        this.navLog('⚠️ [%s] Failed to re-set content script type after reconnection: %O', this.pageName, error);
-      }
-      
-      this.navLog('✅ [%s] Auto-reconnection successful!', this.pageName);
-      this.log('🔄 [%s] Successfully reconnected after URL change', this.pageName);
-      
-      // Signal reconnection completion for any waiting promises
-      this.navLog('🔔 [%s] Checking for reconnection callback: %s', this.pageName, typeof this.onReconnectionComplete);
-      if (this.onReconnectionComplete) {
-        this.navLog('📞 [%s] Calling onReconnectionComplete with URL: %s', this.pageName, newUrl);
-        this.onReconnectionComplete(newUrl);
-      } else {
-        this.navLog('⚠️ [%s] No onReconnectionComplete callback found', this.pageName);
-      }
-      
-    } catch (error) {
-      this.navLog('❌ [%s] Auto-reconnection failed: %O', this.pageName, error);
-      console.error(`❌ [${this.pageName}] Auto-reconnection failed:`, error);
-      
-      // Signal reconnection failure for any waiting promises
-      if (this.onReconnectionFailure) {
-        this.onReconnectionFailure(newUrl, error);
-      }
-    }
-  }
-
-  /**
-   * Enable or disable automatic reconnection
-   * @param {boolean} enabled - Whether to enable auto-reconnection
-   */
-  setAutoReconnect(enabled) {
-    this.isAutoReconnectEnabled = enabled;
-    this.navLog('🔧 [%s] Auto-reconnect %s', this.pageName, enabled ? 'enabled' : 'disabled');
-  }
-
-  /**
-   * Manually trigger a reconnection (useful for testing)
-   */
-  async manualReconnect() {
-    const currentUrl = this.page ? this.page.url() : null;
-    if (currentUrl) {
-      this.navLog('🔄 [%s] Manual reconnection triggered', this.pageName);
-      await this.handleUrlChange(currentUrl, 'manual-trigger');
-    } else {
-      throw new Error('Page not available for manual reconnection');
-    }
-  }
 
   /**
    * Create a messenger for this page
@@ -552,11 +407,19 @@ export class CliskPage {
   createMessenger() {
     return {
       postMessage: async (message, transfer) => {
-        this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
+        // this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
         
-        await this.page.evaluate((msg) => {
-          window.postMessage(msg, '*');
-        }, message);
+        try {
+          await this.page.evaluate((msg) => {
+            window.postMessage(msg, '*');
+          }, message);
+        } catch (error) {
+          if (error.message && error.message.includes('Execution context was destroyed')) {
+            this.commLog('🔄 Execution context destroyed during postMessage, treating as navigation for message: ' + JSON.stringify(message));
+            throw new Error('EXECUTION_CONTEXT_DESTROYED: Navigation occurred during message sending');
+          }
+          throw error;
+        }
       },
       
       addMessageListener: (listener) => {
@@ -564,7 +427,7 @@ export class CliskPage {
         
         // Store the listener for this page instance
         this.messageHandler = (data) => {
-          this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
+          // this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
           listener({ data });
         };
         
@@ -575,6 +438,15 @@ export class CliskPage {
         };
       }
     };
+  }
+
+  /**
+   * Add additional local methods that can be called by the connector
+   * @param {Object} methods - Object containing method name-function pairs
+   */
+  addLocalMethods(methods) {
+    this.additionalLocalMethods = { ...this.additionalLocalMethods, ...methods };
+    this.commLog('🔧 [%s] Added %d additional local methods', this.pageName, Object.keys(methods).length);
   }
 
   /**
@@ -589,175 +461,9 @@ export class CliskPage {
         return `pong from ${this.pageName}`;
       },
       
-      // Method to log messages
-      log: (message) => {
-        this.commLog('📝 [%s] Connector says: %s', this.pageName, message);
-      },
-      
-      // Method to get page info
-      getPageInfo: () => {
-        this.commLog('ℹ️ [%s] Page info requested', this.pageName);
-        return { 
-          pageName: this.pageName, 
-          timestamp: Date.now(),
-          status: 'ready'
-        };
-      },
-      
-      // Method to simulate a response
-      simulateResponse: (data) => {
-        this.commLog('🎭 [%s] Simulating response for: %O', this.pageName, data);
-        return { 
-          success: true, 
-          timestamp: Date.now(), 
-          echo: data,
-          pageName: this.pageName
-        };
-      },
-
-      // Method to set content script type (required by cozy-clisk connectors)
-      setContentScriptType: (contentScriptType) => {
-        this.commLog('🏷️ [%s] setContentScriptType called with: %s', this.pageName, contentScriptType);
-        // Store the content script type
-        this.contentScriptType = contentScriptType;
-        return true;
-      }
     };
 
-    // Add pilot-specific methods
-    if (this.pageName === 'pilot') {
-      baseMethods.setWorkerState = async (state) => {
-        this.commLog('🎯 [%s] setWorkerState called with: %O', this.pageName, state);
-        return await this.setWorkerState(state);
-      };
-
-      baseMethods.runInWorker = async (method, ...args) => {
-        this.commLog('🔧 [%s] runInWorker called: method=%s, args=%O', this.pageName, method, args);
-        
-        if (!this.workerReference) {
-          throw new Error('Worker reference not set. Call setWorkerReference first.');
-        }
-        
-        if (!this.workerReference.connection) {
-          throw new Error('Worker connection not available.');
-        }
-        
-        try {
-          // Call the specified method on the worker with the provided arguments
-          const result = await this.workerReference.connection.remoteHandle().call(method, ...args);
-          this.commLog('✅ [%s] runInWorker result: %O', this.pageName, result);
-          return result;
-        } catch (error) {
-          this.commLog('❌ [%s] runInWorker error: %O', this.pageName, error);
-          throw error;
-        }
-      };
-    }
-
-    return baseMethods;
-  }
-
-  /**
-   * Set worker reference for pilot page (enables cross-page communication)
-   * @param {CliskPage} workerPage - Reference to the worker page
-   */
-  setWorkerReference(workerPage) {
-    if (this.pageName === 'pilot') {
-      this.workerReference = workerPage;
-      this.log('🔗 [%s] Worker reference set for cross-page communication', this.pageName);
-    } else {
-      throw new Error('setWorkerReference can only be called on pilot pages');
-    }
-  }
-
-  /**
-   * Set worker state (URL) and wait for reconnection - only available for pilot
-   * @param {Object} state - State object containing url
-   * @returns {Promise} Promise that resolves when worker reconnection is complete
-   */
-  async setWorkerState(state) {
-    if (this.pageName !== 'pilot') {
-      throw new Error('setWorkerState can only be called from pilot pages');
-    }
-    
-    if (!this.workerReference) {
-      throw new Error('Worker reference not set. Call setWorkerReference first.');
-    }
-    
-    const { url } = state;
-    if (!url) {
-      throw new Error('setWorkerState requires a url in the state object');
-    }
-    
-    this.log('🎯 [%s] Setting worker URL to: %s', this.pageName, url);
-    
-    // Create a promise that will resolve when worker reconnection is complete
-    const reconnectionId = Date.now().toString();
-    
-    const reconnectionPromise = new Promise((resolve, reject) => {
-      // Set a timeout to avoid hanging forever
-      const timeout = setTimeout(() => {
-        this.reconnectionPromises.delete(reconnectionId);
-        reject(new Error(`Worker reconnection timeout after navigating to ${url}`));
-      }, 30000); // 30 second timeout
-      
-      // Store the resolve function to be called when reconnection completes
-      this.reconnectionPromises.set(reconnectionId, {
-        resolve: (result) => {
-          clearTimeout(timeout);
-          this.reconnectionPromises.delete(reconnectionId);
-          resolve(result);
-        },
-        reject: (error) => {
-          clearTimeout(timeout);
-          this.reconnectionPromises.delete(reconnectionId);
-          reject(error);
-        },
-        url,
-        startTime: Date.now()
-      });
-    });
-    
-    // Setup a one-time listener for worker reconnection
-    const pilot = this; // Capture pilot reference for callback
-    this.log('🔧 [%s] Setting up onReconnectionComplete callback on worker', this.pageName);
-    this.workerReference.onReconnectionComplete = (reconnectedUrl) => {
-      pilot.log('📞 [%s] onReconnectionComplete callback triggered for URL: %s', pilot.pageName, reconnectedUrl);
-      // Find and resolve any pending promises for this URL
-      for (const [id, promise] of pilot.reconnectionPromises.entries()) {
-        // Normalize URLs for comparison (remove trailing slash)
-        const normalizeUrl = (url) => url.replace(/\/$/, '');
-        const expectedUrl = normalizeUrl(promise.url);
-        const actualUrl = normalizeUrl(reconnectedUrl);
-        
-        pilot.log('🔍 [%s] Comparing URLs: expected="%s" actual="%s"', pilot.pageName, expectedUrl, actualUrl);
-        
-        if (expectedUrl === actualUrl) {
-          pilot.log('✅ [%s] Worker reconnection complete for URL: %s (took %dms)', 
-            pilot.pageName, reconnectedUrl, Date.now() - promise.startTime);
-          promise.resolve({ 
-            success: true, 
-            url: reconnectedUrl, 
-            duration: Date.now() - promise.startTime 
-          });
-        }
-      }
-    };
-    
-    // Navigate worker to new URL (this will trigger auto-reconnection)
-    try {
-      await this.workerReference.navigate(url);
-      this.log('🌐 [%s] Worker navigation initiated to: %s', this.pageName, url);
-    } catch (error) {
-      // If navigation fails, reject all pending promises
-      const promise = this.reconnectionPromises.get(reconnectionId);
-      if (promise) {
-        promise.reject(new Error(`Worker navigation failed: ${error.message}`));
-      }
-      throw error;
-    }
-    
-    // Return the promise that will resolve when reconnection is complete
-    return reconnectionPromise;
+    // Merge with additional methods provided by services
+    return { ...baseMethods, ...this.additionalLocalMethods };
   }
 } 

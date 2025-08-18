@@ -16,6 +16,10 @@ The goal is to allow developers to create clisk connectors with the lightest pos
 
 - **Console logs** : All console messages that arrive in the page are shown in the standard output of the program.
 
+- **Configuration management** : Uses the `conf` library to manage settings with file-based configuration and command line overrides.
+
+- **Browser profiles** : Support for persistent browser profiles to maintain session data, cookies, and browser state across test runs. Each profile is isolated and can be used for different testing scenarios.
+
 ## Architecture
 
 The project uses a multi-page architecture with:
@@ -39,12 +43,202 @@ yarn playwright install
 
 ## Launch
 
-### Simplest handshake connector
+## Configuration
 
-To launch the project with the template connector:
+The application uses a configuration system with the following hierarchy (highest priority first):
+
+1. **Command line arguments** - Override all other settings
+2. **Environment variables** - LOG_LEVEL, DEBUG
+3. **Local configuration file** - `config.json` in the project root
+4. **User configuration file** - `~/.config/clisk-dev-runner-nodejs/config.json`
+5. **Default values** - Built-in defaults
+
+### Local Configuration File
+
+The project includes a local `config.json` file that serves as the default configuration. This file is **not versioned** in Git to allow each developer to have their own personal settings.
+
+**File location**: `./config.json` (ignored by Git)
+
+To set up your local configuration:
+
+1. Copy the example configuration:
+   ```bash
+   cp config.example.json config.json
+   ```
+
+2. Modify `config.json` with your preferred settings:
+   ```json
+   {
+     "connector": "examples/evaluate-konnector",
+     "logLevel": "normal",
+     "stayOpen": false,
+     "browser": {
+       "headless": false,
+       "args": ["--no-sandbox", "--disable-web-security"]
+     },
+     "mobile": {
+       "hasTouch": true,
+       "isMobile": true,
+       "locale": "fr-FR",
+       "timezoneId": "Europe/Paris",
+       "viewport": {
+         "width": 390,
+         "height": 844
+       },
+       "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
+       "deviceScaleFactor": 3,
+       "geolocation": {
+         "longitude": -74.006,
+         "latitude": 40.7128
+       }
+     }
+   }
+   ```
+
+**Note**: The `config.json` file is ignored by Git to prevent personal settings from being committed to the repository.
+
+### User Configuration File
+
+You can also create a personal configuration file that will override the local defaults:
+
+**File location**: `~/.config/clisk-dev-runner-nodejs/config.json`
+
+This file is created automatically when you first run the application and can be used to set your personal preferences.
+
+Configuration:
+  The application uses a configuration file that can be overridden by command line options.
+  Configuration file location: ./config.json
+  
+  You can set default values in the config file:
+  - connector: Default connector to use
+  - logLevel: Default log level
+  - stayOpen: Default stay-open behavior
+  - profile: Default profile to use
+  - browser: Browser launch options
+  - mobile: Mobile simulation settings
+
+## Browser Profiles
+
+CliskDevRunner supports browser profiles to maintain persistent browser state across test runs. Each profile maintains its own:
+
+- Cookies and session data
+- Browser history
+- Saved passwords
+- Extensions and settings
+
+### Using Profiles
 
 ```bash
-yarn start examples/template-konnector
+# Use a specific profile
+node src/index.js --profile mobile examples/evaluate-konnector
+
+# Use profile with other options
+node src/index.js --profile desktop --stay-open examples/goto-konnector
+
+# Use profile with log level
+node src/index.js --profile test --log-level full examples/minimal-konnector
+```
+
+### Profile Configuration
+
+You can set a default profile in your `config.json`:
+
+```json
+{
+  "profile": "mobile",
+  "connector": "examples/evaluate-konnector",
+  "logLevel": "normal"
+}
+```
+
+### Profile Management
+
+- Profiles are created automatically when first used
+- Each profile is stored in `./profile/{profile-name}/`
+- Profiles are completely isolated from each other
+- The `profile/` directory is ignored by Git
+
+**📖 See [PROFILES.md](PROFILES.md) for detailed documentation on browser profiles.**
+
+## Command Line Interface
+
+The project provides a flexible command line interface with various options:
+
+### Basic Usage
+
+```bash
+# Show help
+node src/index.js --help
+
+# Run with default connector
+node src/index.js
+
+# Run with specific connector
+node src/index.js examples/evaluate-konnector
+```
+
+### Available Options
+
+```bash
+# Help
+-h, --help                  Show help message
+
+# Log level
+-l, --log-level <level>     Set log level: quiet, normal, full, extreme (default: normal)
+                            Can also be set via LOG_LEVEL environment variable
+
+# Stay open mode
+-s, --stay-open             Keep browser window open after connector execution
+                            User must manually close the browser window to exit
+
+# Connector path
+-c, --connector <path>      Specify connector path
+
+# Browser profile
+-p, --profile <name>        Specify a profile to use (e.g., "mobile", "desktop")
+                            Profiles are stored in ./profile directory
+```
+
+### Examples
+
+```bash
+# Run with full logging
+node src/index.js --log-level full examples/goto-konnector
+
+# Run in quiet mode
+node src/index.js -l quiet examples/minimal-konnector
+
+# Keep browser open for inspection
+node src/index.js --stay-open examples/evaluate-konnector
+
+# Use a specific profile
+node src/index.js --profile mobile examples/evaluate-konnector
+
+# Combine options
+node src/index.js --stay-open --log-level extreme examples/goto-konnector
+
+# Use profile with other options
+node src/index.js --profile desktop --stay-open examples/goto-konnector
+```
+
+### Environment Variables
+
+```bash
+# Set log level via environment variable
+LOG_LEVEL=full node src/index.js examples/evaluate-konnector
+
+# Enable quiet mode
+DEBUG="" node src/index.js examples/evaluate-konnector
+```
+
+## Launch (Legacy)
+
+### Simplest goto connector
+
+To launch the project with the simplest goto connector:
+
+```bash
+yarn start examples/goto-konnector
 ```
 
 ### Other available connectors
@@ -55,9 +249,6 @@ yarn start examples/minimal-konnector
 
 # Evaluation connector
 yarn start examples/evaluate-konnector
-
-# Navigation connector
-yarn start examples/goto-konnector
 
 # Default connector (evaluate-konnector)
 yarn start
@@ -91,12 +282,13 @@ npm run start:quiet
 
 ## Project Structure
 
-- `src/index.js` - Main file
+- `src/index.js` - Main file with command line interface and configuration
 - `src/log-config.js` - Log levels configuration
 - `src/PlaywrightLauncher.js` - Playwright manager
 - `src/connector-loader.js` - Connector loader
 - `examples/` - Existing test connectors
 - `package.json` - Dependencies configuration
+- `config.example.json` - Example configuration file (copy to `config.json` for local settings)
 
 ## Tests
 

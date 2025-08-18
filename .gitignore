@@ -75,6 +75,15 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
+# Configuration files
+config.json
+
+# data
+data/
+
+# Browser profiles
+profile/
+
 # IDE files
 .vscode/
 .idea/
