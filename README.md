@@ -23,6 +23,7 @@ The goal is to allow developers to create clisk connectors with the lightest pos
 ## Architecture
 
 The project uses a multi-page architecture with:
+
 - **Worker pages** : Pages where connectors are injected
 - **Pilot pages** : Control pages to orchestrate tests
 - **Post-me communication** : Messaging system between pages
@@ -33,6 +34,14 @@ The project uses a multi-page architecture with:
 ```bash
 yarn install
 ```
+
+Then install [Playwright](https://playwright.dev/) if not done yet :
+
+```bash
+yarn playwright install
+```
+
+## Launch
 
 ## Configuration
 
@@ -296,4 +305,4 @@ yarn test:multi
 yarn test:worker-control
 ```
 
-**📖 See [TEST_USAGE.md](TEST_USAGE.md) for a detailed test guide.** 
+**📖 See [TEST_USAGE.md](TEST_USAGE.md) for a detailed test guide.**
