@@ -15,7 +15,9 @@
     "test:full": "LOG_LEVEL=full node --test test/*.test.js",
     "test:normal": "LOG_LEVEL=normal node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js",
-    "test:verbose": "node --test --test-reporter=spec test/*.test.js"
+    "test:verbose": "node --test --test-reporter=spec test/*.test.js",
+    "format": "prettier --write src test",
+    "format:check": "prettier --check src test"
   },
   "keywords": [
     "playwright",
@@ -32,5 +34,8 @@
     "minimist": "^1.2.8",
     "playwright": "^1.40.0",
     "post-me": "^0.4.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
   }
 }
