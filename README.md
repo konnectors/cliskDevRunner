@@ -66,6 +66,33 @@ LOGIN_USER=alice LOGIN_PASS=secret yarn server
 2. **Start the server** with `yarn server`
 3. **Test your connector** against `http://localhost:3000`
 
+### Testing with the Test Connector
+
+The project includes a `test-konnector` that demonstrates how to interact with the development server:
+
+```bash
+# Start the development server in one terminal
+yarn server
+
+# In another terminal, run the test connector
+yarn start examples/test-konnector
+```
+
+The test connector will:
+
+- Navigate to the login page
+- Check if already authenticated
+- Show login form if needed
+- Wait for authentication
+- Test the complete authentication flow
+
+This is useful for:
+
+- Testing authentication flows
+- Verifying connector behavior with a real server
+- Debugging connector issues
+- Learning how to implement login handling
+
 ## Architecture
 
 The project uses a multi-page architecture with:
@@ -221,6 +248,9 @@ node src/index.js
 
 # Run with specific connector
 node src/index.js examples/evaluate-konnector
+
+# Run test connector (requires development server)
+node src/index.js examples/test-konnector
 ```
 
 ### Available Options
@@ -265,6 +295,9 @@ node src/index.js --stay-open --log-level extreme examples/goto-konnector
 
 # Use profile with other options
 node src/index.js --profile desktop --stay-open examples/goto-konnector
+
+# Test connector with development server
+node src/index.js --stay-open examples/test-konnector
 ```
 
 ### Environment Variables
@@ -287,18 +320,61 @@ To launch the project with the simplest goto connector:
 yarn start examples/goto-konnector
 ```
 
-### Other available connectors
+### Available Connectors
+
+The project includes several example connectors for different testing scenarios:
+
+#### Minimal Connector
 
 ```bash
-# Minimal connector for debug
 yarn start examples/minimal-konnector
+```
 
-# Evaluation connector
+Basic connector for debugging and understanding the framework.
+
+#### Evaluation Connector
+
+```bash
 yarn start examples/evaluate-konnector
+```
 
-# Default connector (evaluate-konnector)
+Demonstrates various evaluation and interaction features.
+
+#### Test Connector
+
+```bash
+yarn start examples/test-konnector
+```
+
+**Requires the development server to be running.** This connector tests the complete authentication flow with the built-in development server.
+
+**Prerequisites:**
+
+1. Start the development server: `yarn server`
+2. Run the test connector: `yarn start examples/test-konnector`
+
+**What it does:**
+
+- Connects to `http://localhost:3000`
+- Tests login form interaction
+- Verifies authentication state
+- Demonstrates proper error handling
+- Shows how to implement a real-world connector
+
+**Use cases:**
+
+- Learning connector development
+- Testing authentication flows
+- Debugging connector issues
+- Verifying server integration
+
+#### Default Connector
+
+```bash
 yarn start
 ```
+
+Runs the evaluation connector by default.
 
 ## Debug
 
