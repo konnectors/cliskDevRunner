@@ -10,6 +10,7 @@
     "start:full": "node src/index.js --log-level full",
     "start:normal": "node src/index.js --log-level normal",
     "start:quiet": "node src/index.js --log-level quiet",
+    "server": "node server/app.js",
     "test": "node --test test/*.test.js",
     "test:extreme": "LOG_LEVEL=extreme node --test test/*.test.js",
     "test:full": "LOG_LEVEL=full node --test test/*.test.js",
@@ -33,7 +34,9 @@
     "debug": "^4.4.1",
     "minimist": "^1.2.8",
     "playwright": "^1.40.0",
-    "post-me": "^0.4.5"
+    "post-me": "^0.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.17.3"
   },
   "devDependencies": {
     "prettier": "^3.6.2"

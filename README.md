@@ -20,6 +20,52 @@ The goal is to allow developers to create clisk connectors with the lightest pos
 
 - **Browser profiles** : Support for persistent browser profiles to maintain session data, cookies, and browser state across test runs. Each profile is isolated and can be used for different testing scenarios.
 
+- **Development server** : Built-in Express server with login form and PDF file listing for testing connector authentication and file download scenarios.
+
+## Development Server
+
+The project includes a simple development server that simulates a website with login authentication and file downloads. This is useful for testing connectors that need to handle login forms and download files.
+
+### Quick Start
+
+```bash
+# Start the development server
+yarn server
+
+# Server will be available at http://localhost:3000
+```
+
+### Features
+
+- **Login form** : Simple authentication page at `/login`
+- **File listing** : Protected page showing available PDF files at `/files`
+- **File downloads** : Secure download endpoints for PDF files
+- **Session management** : Express sessions for maintaining authentication state
+
+### Default Configuration
+
+- **URL** : `http://localhost:3000`
+- **Login credentials** : `user` / `pass`
+- **PDF directory** : `data/pdfs/` (created automatically)
+
+### Environment Variables
+
+You can customize the server behavior with environment variables:
+
+```bash
+# Custom port
+PORT=4000 yarn server
+
+# Custom credentials
+LOGIN_USER=alice LOGIN_PASS=secret yarn server
+```
+
+### Usage for Connector Development
+
+1. **Place PDF files** in the `data/pdfs/` directory
+2. **Start the server** with `yarn server`
+3. **Test your connector** against `http://localhost:3000`
+
 ## Architecture
 
 The project uses a multi-page architecture with:
@@ -62,6 +108,7 @@ The project includes a local `config.json` file that serves as the default confi
 To set up your local configuration:
 
 1. Copy the example configuration:
+
    ```bash
    cp config.example.json config.json
    ```
@@ -105,17 +152,16 @@ You can also create a personal configuration file that will override the local d
 
 This file is created automatically when you first run the application and can be used to set your personal preferences.
 
-Configuration:
-  The application uses a configuration file that can be overridden by command line options.
-  Configuration file location: ./config.json
-  
-  You can set default values in the config file:
-  - connector: Default connector to use
-  - logLevel: Default log level
-  - stayOpen: Default stay-open behavior
-  - profile: Default profile to use
-  - browser: Browser launch options
-  - mobile: Mobile simulation settings
+Configuration: The application uses a configuration file that can be overridden by command line options. Configuration file location: ./config.json
+
+You can set default values in the config file:
+
+- connector: Default connector to use
+- logLevel: Default log level
+- stayOpen: Default stay-open behavior
+- profile: Default profile to use
+- browser: Browser launch options
+- mobile: Mobile simulation settings
 
 ## Browser Profiles
 
