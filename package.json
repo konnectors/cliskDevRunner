@@ -32,11 +32,11 @@
   "dependencies": {
     "conf": "^14.0.0",
     "debug": "^4.4.1",
+    "express": "^4.19.2",
+    "express-session": "^1.17.3",
     "minimist": "^1.2.8",
     "playwright": "^1.40.0",
-    "post-me": "^0.4.5",
-    "express": "^4.19.2",
-    "express-session": "^1.17.3"
+    "post-me": "^0.4.5"
   },
   "devDependencies": {
     "prettier": "^3.6.2"
