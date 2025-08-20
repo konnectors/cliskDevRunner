@@ -10,7 +10,7 @@ export const LOG_LEVELS = {
   EXTREME: 'clisk:*', // Everything - all debug namespaces
   FULL: 'clisk:cli:*,clisk:launcher:*,clisk:*:main,clisk:*:page,clisk:*:nav,clisk:loader:*', // All main logs but no page-level details
   NORMAL: 'clisk:cli:*,clisk:launcher:*,clisk:pilot:main', // cli, launcher, + main page logs
-  QUIET: '', // No debug logs
+  QUIET: '' // No debug logs
 };
 
 /**
@@ -20,10 +20,10 @@ export const LOG_LEVELS = {
 export function configureLogging(level = null) {
   // Determine log level from environment or parameter
   const logLevel = level || process.env.LOG_LEVEL || 'normal';
-  
+
   // Set DEBUG environment variable based on level
   const debugPattern = LOG_LEVELS[logLevel.toUpperCase()] || LOG_LEVELS.NORMAL;
-  
+
   if (debugPattern) {
     process.env.DEBUG = debugPattern;
     // Force debug to re-read the DEBUG environment variable

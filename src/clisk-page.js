@@ -20,7 +20,7 @@ export class CliskPage extends EventEmitter {
    */
   constructor(context, pageName, options = {}) {
     super(); // Call EventEmitter constructor
-    
+
     this.context = context;
     this.pageName = pageName;
     this.options = {
@@ -28,20 +28,20 @@ export class CliskPage extends EventEmitter {
       viewport: { width: 375, height: 667 },
       ...options
     };
-    
+
     // Create debug loggers for this page using the centralized system
     this.log = debug(`clisk:${pageName}:main`);
     this.pageLog = debug(`clisk:${pageName}:page`);
     this.messageLog = debug(`clisk:${pageName}:message`);
     this.commLog = debug(`clisk:${pageName}:comm`);
-    
+
     // Instance variables for isolated state
     this.page = null;
     this.connection = null;
     this.messageHandler = null;
     this.isInitialized = false;
     this.functionsExposed = false; // Track if functions have been exposed
-    
+
     // State tracking for URL changes and handshakes
     this.isNavigationInProgress = false;
     this.isHandshakeInProgress = false;
@@ -49,11 +49,11 @@ export class CliskPage extends EventEmitter {
     this.currentNavigationUrl = null;
     this.navigationStartTime = null;
     this.handshakeStartTime = null;
-    
+
     // Connector state for potential reconnection
     this.connectorPath = null;
     this.loaderFunction = null;
-    
+
     // Additional local methods (can be extended by services)
     this.additionalLocalMethods = {};
   }
@@ -63,19 +63,19 @@ export class CliskPage extends EventEmitter {
    */
   async init() {
     this.log('🚀 Initializing page: %s', this.pageName);
-    
+
     // Create new page with mobile simulation
     this.page = await this.context.newPage();
-    
+
     // Setup console logging for this page
     this.setupConsoleLogging();
-    
+
     // Setup post-me communication bridge BEFORE any navigation
     await this.setupPostMeCommunication();
-    
+
     this.isInitialized = true;
     this.log('✅ Page initialized: %s', this.pageName);
-    
+
     return this.page;
   }
 
@@ -87,19 +87,19 @@ export class CliskPage extends EventEmitter {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before navigation');
     }
-    
+
     // Set navigation state
     this.isNavigationInProgress = true;
     this.currentNavigationUrl = url;
     this.navigationStartTime = Date.now();
-    
+
     try {
       this.log('🌐 Navigating to: %s', url);
       await this.page.goto(url);
-      
+
       // Wait a bit for the page to be ready and scripts to execute
       await this.page.waitForTimeout(500);
-      
+
       this.log('✅ Navigation completed to: %s', url);
     } catch (error) {
       this.log('❌ Navigation failed to: %s - %O', url, error);
@@ -121,16 +121,16 @@ export class CliskPage extends EventEmitter {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before loading connector');
     }
-    
+
     this.log('📦 Loading connector: %s', connectorPath);
-    
+
     // Store connector details for potential reconnection
     this.connectorPath = connectorPath;
     this.loaderFunction = loaderFunction;
-    
+
     const manifest = await loaderFunction(this.page, connectorPath);
     this.log('📋 Loaded: %s v%s', manifest.name, manifest.version);
-    
+
     return manifest;
   }
 
@@ -143,34 +143,30 @@ export class CliskPage extends EventEmitter {
     if (!this.isInitialized) {
       throw new Error('Page must be initialized before handshake');
     }
-    
-    const {
-      maxAttempts = 10,
-      attemptInterval = 1000,
-      waitTime = 3000
-    } = options;
+
+    const { maxAttempts = 10, attemptInterval = 1000, waitTime = 3000 } = options;
 
     // Set handshake state
     this.isHandshakeInProgress = true;
     this.handshakeStartTime = Date.now();
 
     this.commLog('🤝 Initiating post-me handshake...');
-    
+
     const messenger = this.createMessenger();
     const localMethods = this.getLocalMethods();
-    
+
     // Debug: log available methods
     this.commLog('🔍 [%s] Available local methods: %O', this.pageName, Object.keys(localMethods));
 
     try {
       // Wait for connector to be ready
       this.commLog('⏳ Waiting for connector to initialize...');
-      
+
       // Check if page is still valid before waiting
       if (!this.page || this.page.isClosed()) {
         throw new Error('Page was closed before handshake could complete');
       }
-      
+
       try {
         await this.page.waitForTimeout(waitTime);
       } catch (error) {
@@ -179,20 +175,14 @@ export class CliskPage extends EventEmitter {
         }
         throw error;
       }
-      
+
       // Initiate handshake
       this.commLog('🚀 Starting ParentHandshake...');
-      
-      this.connection = await ParentHandshake(
-        messenger,
-        localMethods,
-        maxAttempts,
-        attemptInterval
-      );
-      
+
+      this.connection = await ParentHandshake(messenger, localMethods, maxAttempts, attemptInterval);
+
       this.commLog('✅ Post-me handshake successful!');
-      
-      
+
       // Set content script type if provided
       if (contentScriptType) {
         try {
@@ -204,24 +194,23 @@ export class CliskPage extends EventEmitter {
       }
 
       // Emit handshake success event
-      this.emit('connection:success', { 
-        pageName: this.pageName, 
+      this.emit('connection:success', {
+        pageName: this.pageName,
         connection: this.connection,
         url: this.page.url(),
         timestamp: Date.now(),
         duration: Date.now() - this.handshakeStartTime
       });
-      
+
       return this.connection;
-      
     } catch (error) {
       // Don't log errors if page is closed (normal during cleanup)
-      const isPageClosedError = error.message && (
-        error.message.includes('Target page, context or browser has been closed') ||
-        error.message.includes('Page was closed during handshake initialization') ||
-        error.message.includes('Page was closed before handshake could complete')
-      );
-      
+      const isPageClosedError =
+        error.message &&
+        (error.message.includes('Target page, context or browser has been closed') ||
+          error.message.includes('Page was closed during handshake initialization') ||
+          error.message.includes('Page was closed before handshake could complete'));
+
       if (!isPageClosedError) {
         console.error(`❌ [${this.pageName}] Post-me handshake failed:`, error);
       }
@@ -252,7 +241,7 @@ export class CliskPage extends EventEmitter {
    */
   async close() {
     this.log('🛑 Closing page: %s', this.pageName);
-    
+
     try {
       // Close post-me connection first
       if (this.connection) {
@@ -263,24 +252,23 @@ export class CliskPage extends EventEmitter {
         }
         this.connection = null;
       }
-      
+
       // Wait a moment for any pending operations
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Close the page
       if (this.page && !this.page.isClosed()) {
         await this.page.close();
       }
       this.page = null;
-      
     } catch (error) {
       this.log('⚠️ Error during close: %O', error);
     }
-    
+
     // Cleanup message handler and state
     this.messageHandler = null;
     this.isInitialized = false;
-    
+
     // Reset all state tracking flags
     this.isNavigationInProgress = false;
     this.isHandshakeInProgress = false;
@@ -288,7 +276,7 @@ export class CliskPage extends EventEmitter {
     this.currentNavigationUrl = null;
     this.navigationStartTime = null;
     this.handshakeStartTime = null;
-    
+
     this.log('✅ Page closed: %s', this.pageName);
   }
 
@@ -311,16 +299,16 @@ export class CliskPage extends EventEmitter {
    */
   async setupPostMeCommunication(exposeFunctions = true) {
     this.commLog('🔗 Setting up post-me communication bridge...');
-    
+
     // Only expose functions if requested and not already exposed
     if (exposeFunctions && !this.functionsExposed) {
       // Expose functions directly on this page
-      await this.page.exposeFunction('sendToPlaywright', (data) => {
+      await this.page.exposeFunction('sendToPlaywright', data => {
         if (this.messageHandler) {
           this.messageHandler(data);
         }
       });
-      
+
       await this.page.exposeFunction('sendPageLog', (level, ...args) => {
         if (level === 'error') {
           console.error(`[${this.pageName} Page Error]`, ...args);
@@ -328,7 +316,7 @@ export class CliskPage extends EventEmitter {
           this.pageLog(`[${level}] %o`, args);
         }
       });
-      
+
       this.functionsExposed = true;
       this.commLog('🔧 Functions exposed for %s', this.pageName);
     } else if (exposeFunctions) {
@@ -336,10 +324,10 @@ export class CliskPage extends EventEmitter {
     } else {
       this.commLog('⏭️ Skipping function exposure for %s (reconnection mode)', this.pageName);
     }
-    
+
     // Always inject the page script (this is safe to re-inject)
     await this.injectPageScript();
-    
+
     this.commLog('🔧 Setup completed for %s', this.pageName);
   }
 
@@ -393,12 +381,10 @@ export class CliskPage extends EventEmitter {
       
       pageLogger.log('✅ [${this.pageName}] ReactNativeWebView and post-me bridge ready');
     `;
-    
+
     await this.page.addInitScript(initScript);
     this.commLog('🔧 Setup script injected for %s', this.pageName);
   }
-
-
 
   /**
    * Create a messenger for this page
@@ -408,9 +394,9 @@ export class CliskPage extends EventEmitter {
     return {
       postMessage: async (message, transfer) => {
         // this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
-        
+
         try {
-          await this.page.evaluate((msg) => {
+          await this.page.evaluate(msg => {
             window.postMessage(msg, '*');
           }, message);
         } catch (error) {
@@ -421,16 +407,16 @@ export class CliskPage extends EventEmitter {
           throw error;
         }
       },
-      
-      addMessageListener: (listener) => {
+
+      addMessageListener: listener => {
         this.commLog('👂 Setting up message listener for %s...', this.pageName);
-        
+
         // Store the listener for this page instance
-        this.messageHandler = (data) => {
+        this.messageHandler = data => {
           // this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
           listener({ data });
         };
-        
+
         // Return cleanup function
         return () => {
           this.commLog('🧹 Cleaning up message listener for %s', this.pageName);
@@ -459,11 +445,10 @@ export class CliskPage extends EventEmitter {
       ping: () => {
         this.commLog('🏓 [%s] Ping received from connector!', this.pageName);
         return `pong from ${this.pageName}`;
-      },
-      
+      }
     };
 
     // Merge with additional methods provided by services
     return { ...baseMethods, ...this.additionalLocalMethods };
   }
-} 
+}
