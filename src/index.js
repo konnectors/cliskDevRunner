@@ -1,97 +1,107 @@
-import { getLogger, configureLogging } from './log-config.js';
-import PlaywrightLauncher from './PlaywrightLauncher.js';
-import minimist from 'minimist';
-import Conf from 'conf';
+import { getLogger, configureLogging } from "./log-config.js";
+import PlaywrightLauncher from "./PlaywrightLauncher.js";
+import minimist from "minimist";
+import Conf from "conf";
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
-  string: ['log-level', 'connector', 'profile'],
-  boolean: ['help', 'h', 'stay-open'],
+  string: ["log-level", "connector", "profile", "instance-url"],
+  boolean: ["help", "h", "stay-open"],
   alias: {
-    h: 'help',
-    l: 'log-level',
-    s: 'stay-open',
-    c: 'connector',
-    p: 'profile'
-  }
+    h: "help",
+    l: "log-level",
+    s: "stay-open",
+    c: "connector",
+    p: "profile",
+    i: "instance-url",
+  },
 });
 
 // Initialize configuration with conf
 const config = new Conf({
-  projectName: 'clisk-dev-runner',
-  configName: 'config',
+  projectName: "clisk-dev-runner",
+  configName: "config",
   cwd: process.cwd(),
   schema: {
+    instance: {
+      type: "string",
+      default: undefined,
+    },
     connector: {
-      type: 'string',
-      default: 'examples/evaluate-konnector'
+      type: "string",
+      default: "examples/evaluate-konnector",
     },
     logLevel: {
-      type: 'string',
-      enum: ['quiet', 'normal', 'full', 'extreme'],
-      default: 'normal'
+      type: "string",
+      enum: ["quiet", "normal", "full", "extreme"],
+      default: "normal",
     },
     stayOpen: {
-      type: 'boolean',
-      default: false
+      type: "boolean",
+      default: false,
     },
     profile: {
-      type: 'string',
-      default: undefined
+      type: "string",
+      default: undefined,
     },
     browser: {
-      type: 'object',
+      type: "object",
       properties: {
-        headless: { type: 'boolean', default: false },
-        args: { type: 'array', default: ['--no-sandbox', '--disable-web-security'] }
-      }
+        headless: { type: "boolean", default: false },
+        args: {
+          type: "array",
+          default: ["--no-sandbox", "--disable-web-security"],
+        },
+      },
     },
     mobile: {
-      type: 'object',
+      type: "object",
       properties: {
-        hasTouch: { type: 'boolean', default: true },
-        isMobile: { type: 'boolean', default: true },
-        locale: { type: 'string', default: 'fr-FR' },
-        timezoneId: { type: 'string', default: 'Europe/Paris' },
+        hasTouch: { type: "boolean", default: true },
+        isMobile: { type: "boolean", default: true },
+        locale: { type: "string", default: "fr-FR" },
+        timezoneId: { type: "string", default: "Europe/Paris" },
         viewport: {
-          type: 'object',
+          type: "object",
           properties: {
-            width: { type: 'number', default: 390 },
-            height: { type: 'number', default: 844 }
-          }
+            width: { type: "number", default: 390 },
+            height: { type: "number", default: 844 },
+          },
         },
-        userAgent: { type: 'string' },
-        deviceScaleFactor: { type: 'number', default: 3 },
+        userAgent: { type: "string" },
+        deviceScaleFactor: { type: "number", default: 3 },
         geolocation: {
-          type: 'object',
+          type: "object",
           properties: {
-            longitude: { type: 'number', default: -74.006 },
-            latitude: { type: 'number', default: 40.7128 }
-          }
-        }
-      }
-    }
+            longitude: { type: "number", default: -74.006 },
+            latitude: { type: "number", default: 40.7128 },
+          },
+        },
+      },
+    },
   },
   defaults: {
-    connector: 'examples/evaluate-konnector',
-    logLevel: 'normal',
+    instance: undefined,
+    connector: "examples/evaluate-konnector",
+    logLevel: "normal",
     stayOpen: false,
     profile: undefined,
     browser: {
       headless: false,
-      args: ['--no-sandbox', '--disable-web-security']
+      args: ["--no-sandbox", "--disable-web-security"],
     },
     mobile: {
       hasTouch: true,
       isMobile: true,
-      locale: 'fr-FR',
-      timezoneId: 'Europe/Paris',
+      locale: "fr-FR",
+      timezoneId: "Europe/Paris",
       viewport: { width: 390, height: 844 },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
       deviceScaleFactor: 3,
-      geolocation: { longitude: -74.006, latitude: 40.7128 }
-    }
-  }
+      geolocation: { longitude: -74.006, latitude: 40.7128 },
+    },
+  },
 });
 
 // Help function
@@ -114,6 +124,8 @@ Options:
   -c, --connector <path>      Specify connector path
   -p, --profile <name>        Specify a profile to use (e.g., "mobile", "desktop")
                               Profiles are stored in ./profile directory
+  -i, --instance-url <name>   Specify the targeted instance
+                              Mandatory to initialize cozy-client
 
 Configuration:
   The application uses a configuration file that can be overridden by command line options.
@@ -134,6 +146,7 @@ Examples:
   node src/index.js --connector examples/goto-konnector --log-level quiet
   node src/index.js --profile mobile examples/evaluate-konnector
   node src/index.js --profile desktop --stay-open examples/goto-konnector
+  node src/index.js --instance-url myinstance.mycozy.cloud --stay-open examples/goto-konnector
 
 Environment Variables:
   LOG_LEVEL                   Set log level (overrides --log-level option)
@@ -148,97 +161,112 @@ if (argv.help) {
 }
 
 // Update configuration with command line arguments (command line takes precedence)
-if (argv['log-level']) {
-  config.set('logLevel', argv['log-level']);
+if (argv["log-level"]) {
+  config.set("logLevel", argv["log-level"]);
 }
-if (argv['stay-open']) {
-  config.set('stayOpen', true);
+if (argv["stay-open"]) {
+  config.set("stayOpen", true);
 }
 if (argv.connector) {
-  config.set('connector', argv.connector);
+  config.set("connector", argv.connector);
 }
 if (argv.profile) {
-  config.set('profile', argv.profile);
+  config.set("profile", argv.profile);
 }
 // Handle positional connector argument
 if (argv._[0]) {
-  config.set('connector', argv._[0]);
+  config.set("connector", argv._[0]);
+}
+if (argv["instance-url"]) {
+  config.set("instance", argv["instance-url"]);
+} else if (!argv["instance-url"] && !config.get("instance")) {
+  console.error(
+    "❌ Twake instance URL is required. Please provide it via --instance-url or set the 'instance' property in the configuration file."
+  );
+  process.exit(1);
 }
 
 // Get configuration values
-const connectorPath = config.get('connector');
-let logLevel = config.get('logLevel');
+const connectorPath = config.get("connector");
+let logLevel = config.get("logLevel");
+const targetedInstance = config.get("instance");
 
 // Check if DEBUG is explicitly set to empty (quiet mode from npm script)
-if (process.env.DEBUG === '') {
-  logLevel = 'quiet';
+if (process.env.DEBUG === "") {
+  logLevel = "quiet";
 }
 
 configureLogging(logLevel);
 
-const log = getLogger('clisk:cli:main');
+const log = getLogger("clisk:cli:main");
 
 async function main() {
-  log('🚀 Starting CliskDevRunner...');
+  log("🚀 Starting CliskDevRunner...");
+  log(`⚙️  Targeted Instance: ${targetedInstance}`);
   log(`📁 Using connector: ${connectorPath}`);
   log(`⚙️  Configuration file: ${config.path}`);
-  if (logLevel.toLowerCase() !== 'quiet') {
+  if (logLevel.toLowerCase() !== "quiet") {
     log(`🔧 Log level: ${logLevel.toUpperCase()}`);
   }
-  
-  const profile = config.get('profile');
+
+  const profile = config.get("profile");
   if (profile) {
     log(`👤 Using profile: ${profile}`);
   }
-  
-  if (config.get('stayOpen')) {
-    log('🔓 Stay-open mode enabled - browser window will remain open after execution');
+
+  if (config.get("stayOpen")) {
+    log(
+      "🔓 Stay-open mode enabled - browser window will remain open after execution"
+    );
   }
 
   const launcher = new PlaywrightLauncher();
-  
+
   try {
     await launcher.init(connectorPath, {
       profile: profile,
-      browser: config.get('browser'),
-      mobile: config.get('mobile')
+      browser: config.get("browser"),
+      mobile: config.get("mobile"),
+      targetedInstance: targetedInstance,
     });
     await launcher.start();
-    
-    if (config.get('stayOpen')) {
-      log('\n🎯 Connector execution completed!');
-      log('🔓 Browser window will remain open for inspection.');
-      log('💡 Close the browser window manually to exit the program.');
-      
+
+    if (config.get("stayOpen")) {
+      log("\n🎯 Connector execution completed!");
+      log("🔓 Browser window will remain open for inspection.");
+      log("💡 Close the browser window manually to exit the program.");
+
       // Wait for browser to be closed manually
       await new Promise((resolve) => {
         let browserClosed = false;
-        
+
         // Function to check if browser tabs are still accessible
         const checkTabsAccessible = async () => {
           try {
             const pilotPage = launcher.getPilotPage();
             const workerPage = launcher.getWorkerPage();
-            
+
             if (!pilotPage || !workerPage) {
               return true;
             }
-            
+
             // Try to access title of both tabs
             const pilotTitle = await pilotPage.page.title();
             const workerTitle = await workerPage.page.title();
-            
+
             return false; // Both tabs are still accessible
           } catch (error) {
-            log('🔍 One or both tabs are no longer accessible, assuming closed');
+            log(
+              "🔍 One or both tabs are no longer accessible, assuming closed"
+            );
             return true; // At least one tab is closed
           }
         };
-        
+
         // Check periodically
         const checkInterval = setInterval(async () => {
           if (browserClosed) return;
-          
+
           const isClosed = await checkTabsAccessible();
           if (isClosed) {
             browserClosed = true;
@@ -246,7 +274,7 @@ async function main() {
             resolve();
           }
         }, 1000);
-        
+
         // Also listen for process signals
         const cleanup = () => {
           if (!browserClosed) {
@@ -255,35 +283,35 @@ async function main() {
             resolve();
           }
         };
-        
-        process.on('SIGINT', cleanup);
-        process.on('SIGTERM', cleanup);
+
+        process.on("SIGINT", cleanup);
+        process.on("SIGTERM", cleanup);
       });
-      
-      log('✅ Browser closed by user, exiting...');
+
+      log("✅ Browser closed by user, exiting...");
       process.exit(0);
     } else {
       await launcher.stop();
     }
   } catch (error) {
-    console.error('❌ Test failed:', error);
-    
+    console.error("❌ Test failed:", error);
+
     // Cleanup on error (always stop, even in stay-open mode)
     try {
       await launcher.stop();
     } catch (cleanupError) {
-      console.error('⚠️ Error during cleanup:', cleanupError);
+      console.error("⚠️ Error during cleanup:", cleanupError);
     }
-    
+
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  log('\n🛑 Received SIGINT, shutting down gracefully...');
+process.on("SIGINT", async () => {
+  log("\n🛑 Received SIGINT, shutting down gracefully...");
   process.exit(0);
 });
 
 // Start the application
-main().catch(console.error); 
+main().catch(console.error);
