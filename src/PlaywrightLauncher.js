@@ -6,8 +6,8 @@ import { PilotService } from './services/pilot-service.js';
 import { WorkerService } from './services/worker-service.js';
 
 // Common JS-compatible import
-import pkg from 'cozy-client';
-const { default: CozyClient } = pkg;
+import cliPkg from 'cozy-client/dist/cli/index.js';
+const { createClientInteractive } = cliPkg;
 
 // import credentials file for token access
 import fs from 'fs';
@@ -59,9 +59,12 @@ class PlaywrightLauncher {
     }
     //////////////////////////////////////////////////////
 
-    this.cozyClient = await createCozyClient({
-      targetedInstance,
-      token: credentials.token
+    this.cozyClient = await createClientInteractive({
+      uri: targetedInstance,
+      scope: ['io.cozy.files'],
+      oauth: {
+        softwareID: 'cliskDevRunner'
+      }
     });
 
     // Determine user data directory based on profile
@@ -264,27 +267,6 @@ class PlaywrightLauncher {
   isReady() {
     return this.isInitialized && this.pilotPage && this.workerPage && this.pilotService && this.workerService;
   }
-}
-
-async function createCozyClient({ targetedInstance, token }) {
-  log('🔨  Creation of the a new client ...');
-  const client = new CozyClient({
-    uri: `http://${targetedInstance}`,
-    schema: {
-      files: {
-        doctype: 'io.cozy.files'
-      }
-    },
-    token
-  });
-
-  const files = await client.collection('io.cozy.files').all();
-  if (files) {
-    log('✅  Client succesfully created');
-  } else {
-    throw new Error('❌  Something went wrong when trying to create new client');
-  }
-  return client;
 }
 
 export default PlaywrightLauncher;
