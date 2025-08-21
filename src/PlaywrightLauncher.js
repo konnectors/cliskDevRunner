@@ -1,20 +1,20 @@
-import { chromium } from "playwright";
-import { getLogger } from "./log-config.js";
-import { loadConnector } from "./connector-loader.js";
-import { CliskPage } from "./clisk-page.js";
-import { PilotService } from "./services/pilot-service.js";
-import { WorkerService } from "./services/worker-service.js";
+import { chromium } from 'playwright';
+import { getLogger } from './log-config.js';
+import { loadConnector } from './connector-loader.js';
+import { CliskPage } from './clisk-page.js';
+import { PilotService } from './services/pilot-service.js';
+import { WorkerService } from './services/worker-service.js';
 
 // Common JS-compatible import
-import pkg from "cozy-client";
-const { default: CozyClient } = pkg;
+import cliPkg from 'cozy-client/dist/cli/index.js';
+const { createClientInteractive } = cliPkg;
 
 // import credentials file for token access
-import fs from "fs";
-import path from "path";
+import fs from 'fs';
+import path from 'path';
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-const log = getLogger("clisk:launcher:playwright");
+const log = getLogger('clisk:launcher:playwright');
 
 class PlaywrightLauncher {
   constructor() {
@@ -28,53 +28,53 @@ class PlaywrightLauncher {
     this.isInitialized = false;
   }
 
-  async init(connectorPath = "examples/evaluate-konnector", options = {}) {
-    log("🚀 Initializing PlaywrightLauncher...");
+  async init(connectorPath = 'examples/evaluate-konnector', options = {}) {
+    log('🚀 Initializing PlaywrightLauncher...');
     log(`📁 Using connector: ${connectorPath}`);
 
     this.connectorPath = connectorPath;
 
     // Get configuration options
-    const {
-      profile,
-      browser: browserConfig,
-      mobile: mobileConfig,
-      targetedInstance,
-    } = options;
+    const { profile, browser: browserConfig, mobile: mobileConfig, targetedInstance } = options;
 
     /* TO COMMENT IF YOU DONT NEED TO READ CREDENTIALS FROM FILE */
     let credentials;
-    const credPath = path.join(__dirname, "../data/credentials.json");
+    const credPath = path.join(__dirname, '../data/credentials.json');
 
     if (fs.existsSync(credPath)) {
       try {
-        const raw = fs.readFileSync(credPath, "utf-8");
+        const raw = fs.readFileSync(credPath, 'utf-8');
         credentials = JSON.parse(raw);
 
         if (!credentials) {
           log('⚠️ credentials.json exists but no "token" key found.');
         } else {
-          log("🔐 Token loaded from credentials.json");
+          log('🔐 Token loaded from credentials.json');
         }
       } catch (err) {
         log(`❌ Failed to read credentials.json: ${err.message}`);
       }
     } else {
-      log("⚠️ No credentials.json file found.");
+      log('⚠️ No credentials.json file found.');
     }
     //////////////////////////////////////////////////////
 
-    this.cozyClient = await createCozyClient({
-      targetedInstance,
-      token: credentials.token,
+    const scopes = await loadScopesFromManifestStrict({ connectorPath, __dirname, log });
+
+    this.cozyClient = await createClientInteractive({
+      uri: targetedInstance,
+      scope: scopes,
+      oauth: {
+        softwareID: 'cliskDevRunner'
+      }
     });
 
     // Determine user data directory based on profile
     let userDataDir = null;
     if (profile) {
-      const path = await import("path");
-      const fs = await import("fs");
-      const profileDir = path.join(process.cwd(), "profile", profile);
+      const path = await import('path');
+      const fs = await import('fs');
+      const profileDir = path.join(process.cwd(), 'profile', profile);
 
       // Create profile directory if it doesn't exist
       if (!fs.existsSync(profileDir)) {
@@ -89,7 +89,7 @@ class PlaywrightLauncher {
     // Launch browser with configuration
     const launchOptions = {
       headless: browserConfig?.headless ?? false,
-      args: browserConfig?.args ?? ["--no-sandbox", "--disable-web-security"],
+      args: browserConfig?.args ?? ['--no-sandbox', '--disable-web-security']
     };
 
     // Create browser context with mobile simulation
@@ -97,28 +97,26 @@ class PlaywrightLauncher {
       // Simulate iPhone 12 mobile environment
       hasTouch: mobileConfig?.hasTouch ?? true,
       isMobile: mobileConfig?.isMobile ?? true,
-      locale: mobileConfig?.locale ?? "fr-FR",
-      timezoneId: mobileConfig?.timezoneId ?? "Europe/Paris",
-      permissions: ["geolocation"],
+      locale: mobileConfig?.locale ?? 'fr-FR',
+      timezoneId: mobileConfig?.timezoneId ?? 'Europe/Paris',
+      permissions: ['geolocation'],
       viewport: mobileConfig?.viewport ?? { width: 390, height: 844 },
-      userAgent:
-        mobileConfig?.userAgent ??
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1",
+      userAgent: mobileConfig?.userAgent ?? 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
       deviceScaleFactor: mobileConfig?.deviceScaleFactor ?? 3,
       javaScriptEnabled: true,
       bypassCSP: false,
       geolocation: mobileConfig?.geolocation ?? {
         longitude: -74.006,
-        latitude: 40.7128,
+        latitude: 40.7128
       },
-      colorScheme: "light",
+      colorScheme: 'light'
     };
 
     if (userDataDir) {
       // Use launchPersistentContext for profiles
       this.context = await chromium.launchPersistentContext(userDataDir, {
         ...launchOptions,
-        ...contextOptions,
+        ...contextOptions
       });
       this.browser = this.context.browser();
     } else {
@@ -128,37 +126,27 @@ class PlaywrightLauncher {
     }
 
     // Create CliskPage instances for pilot and worker
-    this.workerPage = new CliskPage(this.context, "worker");
-    this.pilotPage = new CliskPage(this.context, "pilot");
+    this.workerPage = new CliskPage(this.context, 'worker');
+    this.pilotPage = new CliskPage(this.context, 'pilot');
 
     // Create specialized services
     this.workerService = new WorkerService(this.workerPage);
-    this.pilotService = new PilotService(
-      this.pilotPage,
-      this.workerPage,
-      this.workerService
-    );
+    this.pilotService = new PilotService(this.pilotPage, this.workerPage, this.workerService);
 
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
 
     await this.pilotPage.init();
-    log("✅ Pilot page initialized");
+    log('✅ Pilot page initialized');
 
     await this.workerPage.init();
-    log("✅ Worker page initialized");
+    log('✅ Worker page initialized');
 
     // Navigate both pages to blank page
-    await Promise.all([
-      this.workerPage.navigate("about:blank"),
-      this.pilotPage.navigate("about:blank"),
-    ]);
+    await Promise.all([this.workerPage.navigate('about:blank'), this.pilotPage.navigate('about:blank')]);
 
     // Load connector on both pages
-    log("📦 Loading connectors on both pages...");
-    const [workerManifest, pilotManifest] = await Promise.all([
-      this.workerPage.loadConnector(this.connectorPath, loadConnector),
-      this.pilotPage.loadConnector(this.connectorPath, loadConnector),
-    ]);
+    log('📦 Loading connectors on both pages...');
+    const [workerManifest, pilotManifest] = await Promise.all([this.workerPage.loadConnector(this.connectorPath, loadConnector), this.pilotPage.loadConnector(this.connectorPath, loadConnector)]);
 
     // Setup service-specific local methods
     this.pilotPage.addLocalMethods(this.pilotService.getLocalMethods());
@@ -166,57 +154,48 @@ class PlaywrightLauncher {
 
     // Enable URL monitoring for worker only (not for pilot)
     this.workerService.enableUrlMonitoring();
-    log("🔍 URL monitoring enabled for worker page");
+    log('🔍 URL monitoring enabled for worker page');
 
     // Initiate handshakes in parallel with appropriate content script types
-    const [workerConnection, pilotConnection] = await Promise.all([
-      this.workerPage.initiateHandshake({}, "worker"),
-      this.pilotPage.initiateHandshake({}, "pilot"),
-    ]);
+    const [workerConnection, pilotConnection] = await Promise.all([this.workerPage.initiateHandshake({}, 'worker'), this.pilotPage.initiateHandshake({}, 'pilot')]);
 
     this.isInitialized = true;
-    log("✅ PlaywrightLauncher initialized successfully!");
+    log('✅ PlaywrightLauncher initialized successfully!');
   }
 
   async start() {
     if (!this.isInitialized) {
-      throw new Error("PlaywrightLauncher must be initialized before starting");
+      throw new Error('PlaywrightLauncher must be initialized before starting');
     }
 
-    log("🚀 Starting PlaywrightLauncher...");
+    log('🚀 Starting PlaywrightLauncher...');
 
     try {
       const pilotConnection = this.pilotPage.getConnection();
       if (!pilotConnection) {
-        throw new Error("Pilot connection not available");
+        throw new Error('Pilot connection not available');
       }
 
-      log("🔐 Calling ensureAuthenticated on pilot...");
-      await pilotConnection
-        .remoteHandle()
-        .call("ensureAuthenticated", { account: {} });
-      log("✅ ensureAuthenticated completed successfully!");
-      log("🔐 Calling getUserDataFromWebsite on pilot...");
-      const userDataResult = await pilotConnection
-        .remoteHandle()
-        .call("getUserDataFromWebsite");
-      log("✅ getUserDataFromWebsite result: %O", userDataResult);
+      log('🔐 Calling ensureAuthenticated on pilot...');
+      await pilotConnection.remoteHandle().call('ensureAuthenticated', { account: {} });
+      log('✅ ensureAuthenticated completed successfully!');
+      log('🔐 Calling getUserDataFromWebsite on pilot...');
+      const userDataResult = await pilotConnection.remoteHandle().call('getUserDataFromWebsite');
+      log('✅ getUserDataFromWebsite result: %O', userDataResult);
       if (!userDataResult?.sourceAccountIdentifier) {
-        throw new Error(
-          "getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution."
-        );
+        throw new Error('getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.');
       }
-      log("🔐 Calling fetch on pilot...");
-      await pilotConnection.remoteHandle().call("fetch", {});
-      log("✅  fetch completed successfully!");
+      log('🔐 Calling fetch on pilot...');
+      await pilotConnection.remoteHandle().call('fetch', {});
+      log('✅  fetch completed successfully!');
     } catch (error) {
-      log("❌ Error during start: %O", error);
+      log('❌ Error during start: %O', error);
       throw error;
     }
   }
 
   async stop() {
-    log("🛑 Stopping PlaywrightLauncher...");
+    log('🛑 Stopping PlaywrightLauncher...');
 
     try {
       // Clean up services first
@@ -255,9 +234,9 @@ class PlaywrightLauncher {
       this.workerService = null;
       this.isInitialized = false;
 
-      log("✅ PlaywrightLauncher stopped successfully!");
+      log('✅ PlaywrightLauncher stopped successfully!');
     } catch (error) {
-      log("⚠️ Error during stop: %O", error);
+      log('⚠️ Error during stop: %O', error);
       // Don't throw error during cleanup to ensure resources are freed
     }
   }
@@ -288,37 +267,50 @@ class PlaywrightLauncher {
   }
 
   isReady() {
-    return (
-      this.isInitialized &&
-      this.pilotPage &&
-      this.workerPage &&
-      this.pilotService &&
-      this.workerService
-    );
+    return this.isInitialized && this.pilotPage && this.workerPage && this.pilotService && this.workerService;
   }
 }
 
-async function createCozyClient({ targetedInstance, token }) {
-  log("🔨  Creation of the a new client ...");
-  const client = new CozyClient({
-    uri: `http://${targetedInstance}`,
-    schema: {
-      files: {
-        doctype: "io.cozy.files",
-      },
-    },
-    token,
-  });
-
-  const files = await client.collection("io.cozy.files").all();
-  if (files) {
-    log("✅  Client succesfully created");
-  } else {
-    throw new Error(
-      "❌  Something went wrong when trying to create new client"
-    );
+async function loadScopesFromManifestStrict({ connectorPath, __dirname, log }) {
+  const manifestPath = path.resolve(__dirname, '..', connectorPath, 'manifest.konnector');
+  log(`🔎 Reading manifest: ${manifestPath}`);
+  let raw;
+  try {
+    raw = await fs.promises.readFile(manifestPath, 'utf8');
+  } catch (err) {
+    log(`❌ Cannot read manifest file: ${err.message}`);
+    throw new Error(`Manifest not found or unreadable at ${manifestPath}`);
   }
-  return client;
+
+  let manifest;
+  try {
+    manifest = JSON.parse(raw);
+  } catch (err) {
+    log(`❌ Invalid JSON manifest: ${err.message}`);
+    throw new Error(`Manifest JSON invalid at ${manifestPath}`);
+  }
+
+  const perms = manifest.permissions;
+  if (!perms || typeof perms !== 'object') {
+    log('❌ No "permissions" section found in manifest');
+    throw new Error(`No "permissions" in manifest at ${manifestPath}`);
+  }
+
+  const scopes = Array.from(
+    new Set(
+      Object.values(perms)
+        .map(entry => (typeof entry === 'string' ? entry : entry?.type))
+        .filter(Boolean)
+    )
+  );
+
+  if (scopes.length === 0) {
+    log('❌ No permission types found in manifest');
+    throw new Error(`No permission types found in manifest at ${manifestPath}`);
+  }
+
+  log(`✅ Loaded ${scopes.length} scope(s) from manifest`);
+  return scopes;
 }
 
 export default PlaywrightLauncher;

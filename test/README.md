@@ -5,6 +5,7 @@ This folder contains automated tests to validate the proper functioning of the C
 ## 🧪 Available Tests
 
 ### `handshake.test.js`
+
 Main tests that validate:
 
 1. **Connector loading**
@@ -39,21 +40,25 @@ Main tests that validate:
 ## 🚀 Usage
 
 ### Run all tests
+
 ```bash
 yarn test
 ```
 
 ### Tests in watch mode (automatic re-execution on changes)
+
 ```bash
 yarn test:watch
 ```
 
 ### Tests with detailed output
+
 ```bash
 yarn test:verbose
 ```
 
 ### Run a specific test
+
 ```bash
 node --test test/handshake.test.js
 ```
@@ -61,6 +66,7 @@ node --test test/handshake.test.js
 ## 🏗 Test Architecture
 
 Tests use:
+
 - **Node.js built-in test runner** (no external dependency)
 - **Playwright** for browser automation
 - **CliskPage** for test page isolation
@@ -88,11 +94,11 @@ describe('My Custom Test', () => {
     }
 
     testPage = new MyTestPage(context, 'my-test');
-    
+
     // Your test logic here
     await testPage.init();
     // ...
-    
+
     assert.ok(true, 'Test should pass');
   });
 });
@@ -117,6 +123,7 @@ describe('My Custom Test', () => {
 ## 🔧 Configuration
 
 Tests use a headless browser for speed:
+
 - **User Agent** : Android Mobile WebView
 - **Viewport** : 375x667 (mobile)
 - **Security** : Disabled for tests
@@ -127,14 +134,16 @@ Tests use a headless browser for speed:
 To debug a failing test:
 
 1. **Enable visible mode** :
+
    ```javascript
-   browser = await chromium.launch({ 
+   browser = await chromium.launch({
      headless: false, // See the browser
-     slowMo: 1000     // Slow down actions
+     slowMo: 1000 // Slow down actions
    });
    ```
 
 2. **Add debug logs** :
+
    ```bash
    DEBUG=clisk:* yarn test
    ```
@@ -150,4 +159,4 @@ To debug a failing test:
 - **AAA structure** : Arrange, Act, Assert
 - **Cleanup** : Each test cleans up its resources in `afterEach`
 - **Isolation** : Each test uses its own CliskPage instance
-- **Timeouts** : Adapted to handshake speed (2-5 seconds) 
+- **Timeouts** : Adapted to handshake speed (2-5 seconds)
