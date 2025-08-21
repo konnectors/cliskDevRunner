@@ -5,7 +5,7 @@ import Conf from 'conf';
 
 // Parse command line arguments
 const argv = minimist(process.argv.slice(2), {
-  string: ['log-level', 'connector', 'profile', 'instance-url'],
+  string: ['log-level', 'connector', 'profile', 'domain'],
   boolean: ['help', 'h', 'stay-open'],
   alias: {
     h: 'help',
@@ -13,7 +13,7 @@ const argv = minimist(process.argv.slice(2), {
     s: 'stay-open',
     c: 'connector',
     p: 'profile',
-    i: 'instance-url'
+    d: 'domain'
   }
 });
 
@@ -123,7 +123,7 @@ Options:
   -c, --connector <path>      Specify connector path
   -p, --profile <name>        Specify a profile to use (e.g., "mobile", "desktop")
                               Profiles are stored in ./profile directory
-  -i, --instance-url <name>   Specify the targeted instance
+  -d, --domain <name>         Specify the targeted instance
                               Mandatory to initialize cozy-client
 
 Configuration:
@@ -145,7 +145,7 @@ Examples:
   node src/index.js --connector examples/goto-konnector --log-level quiet
   node src/index.js --profile mobile examples/evaluate-konnector
   node src/index.js --profile desktop --stay-open examples/goto-konnector
-  node src/index.js --instance-url myinstance.mycozy.cloud --stay-open examples/goto-konnector
+  node src/index.js --domain myinstance.mycozy.cloud --stay-open examples/goto-konnector
 
 Environment Variables:
   LOG_LEVEL                   Set log level (overrides --log-level option)
@@ -176,10 +176,10 @@ if (argv.profile) {
 if (argv._[0]) {
   config.set('connector', argv._[0]);
 }
-if (argv['instance-url']) {
-  config.set('instance', argv['instance-url']);
-} else if (!argv['instance-url'] && !config.get('instance')) {
-  console.error("❌ Twake instance URL is required. Please provide it via --instance-url or set the 'instance' property in the configuration file.");
+if (argv['domain']) {
+  config.set('instance', argv['domain']);
+} else if (!argv['domain'] && !config.get('instance')) {
+  console.error("❌ Twake instance URL is required. Please provide it via --domain or set the 'instance' property in the configuration file.");
   process.exit(1);
 }
 
