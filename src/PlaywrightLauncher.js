@@ -4,6 +4,8 @@ import { loadConnector } from './connector-loader.js';
 import { CliskPage } from './clisk-page.js';
 import { PilotService } from './services/pilot-service.js';
 import { WorkerService } from './services/worker-service.js';
+import flag from 'cozy-flags';
+import { listFlags, initialize } from 'cozy-flags/dist/flag.js';
 
 // Common JS-compatible import
 import cliPkg from 'cozy-client/dist/cli/index.js';
@@ -68,6 +70,9 @@ class PlaywrightLauncher {
         softwareID: 'cliskDevRunner'
       }
     });
+
+    // Initialize cozy-flags
+    await initialize(this.cozyClient);
 
     // Determine user data directory based on profile
     let userDataDir = null;
@@ -176,6 +181,16 @@ class PlaywrightLauncher {
         throw new Error('Pilot connection not available');
       }
 
+      const cozyFlags = listFlags();
+      const flagsWithValues = {};
+      if (cozyFlags) {
+        for (const cozyFlag of cozyFlags) {
+          if (cozyFlag.startsWith('clisk')) {
+            flagsWithValues[cozyFlag] = flag.default(cozyFlag);
+          }
+        }
+      }
+
       log('🔐 Calling ensureAuthenticated on pilot...');
       await pilotConnection.remoteHandle().call('ensureAuthenticated', { account: {} });
       log('✅ ensureAuthenticated completed successfully!');
@@ -186,7 +201,7 @@ class PlaywrightLauncher {
         throw new Error('getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.');
       }
       log('🔐 Calling fetch on pilot...');
-      await pilotConnection.remoteHandle().call('fetch', {});
+      await pilotConnection.remoteHandle().call('fetch', { flags: flagsWithValues });
       log('✅  fetch completed successfully!');
     } catch (error) {
       log('❌ Error during start: %O', error);
