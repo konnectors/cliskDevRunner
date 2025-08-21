@@ -138,6 +138,9 @@ class PlaywrightLauncher {
     this.workerService = new WorkerService(this.workerPage);
     this.pilotService = new PilotService(this.pilotPage, this.workerPage, this.workerService);
 
+    this.pilotService.setLauncherClient(this.cozyClient);
+    log(`🔧 PilotService launcherClient set:`, this.pilotService.getStartContext()?.launcherClient);
+
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
 
     await this.pilotPage.init();
@@ -200,6 +203,8 @@ class PlaywrightLauncher {
       if (!userDataResult?.sourceAccountIdentifier) {
         throw new Error('getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.');
       }
+      this.pilotService.setUserData({ sourceAccountIdentifier: userDataResult.sourceAccountIdentifier });
+      log(`🧩 PilotService userData SAI set: ${this.pilotService.getUserData()?.sourceAccountIdentifier}`);
       log('🔐 Calling fetch on pilot...');
       await pilotConnection.remoteHandle().call('fetch', { flags: flagsWithValues });
       log('✅  fetch completed successfully!');
