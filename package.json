@@ -37,6 +37,7 @@
     "debug": "^4.4.1",
     "express": "^4.19.2",
     "express-session": "^1.17.3",
+    "lodash.debounce": "^4.0.8",
     "minimist": "^1.2.8",
     "playwright": "^1.40.0",
     "post-me": "^0.4.5"

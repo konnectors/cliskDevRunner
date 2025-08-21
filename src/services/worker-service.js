@@ -1,5 +1,6 @@
 import debug from 'debug';
 import { EventEmitter } from 'events';
+import debounce from 'lodash.debounce';
 
 /**
  * WorkerService - Gère la logique spécifique au worker
@@ -24,6 +25,9 @@ export class WorkerService extends EventEmitter {
     this.currentReconnectionPromise = null;
     this.reconnectionResolve = null;
     this.reconnectionReject = null;
+
+    // Create debounced version of handleUrlChange with 1000ms delay to handle redirects
+    this.debouncedHandleUrlChange = debounce(this.handleUrlChange.bind(this), 1000);
   }
 
   /**
@@ -83,24 +87,11 @@ export class WorkerService extends EventEmitter {
 
       const newUrl = frame.url();
       const oldUrl = this.currentUrl;
-
-      // Skip if it's the same URL or initial navigation
-      if (!oldUrl || newUrl === oldUrl) {
-        this.currentUrl = newUrl;
-        return;
-      }
-
       this.navLog('🌍 URL changed: %s → %s', oldUrl, newUrl);
       this.currentUrl = newUrl;
 
-      // Skip about:blank navigations (common during testing)
-      if (newUrl === 'about:blank') {
-        this.navLog('⏭️ Skipping about:blank navigation');
-        return;
-      }
-
-      // Trigger reconnection
-      await this.handleUrlChange(newUrl, oldUrl);
+      // Trigger reconnection with debounced function
+      await this.debouncedHandleUrlChange(newUrl, oldUrl);
     });
 
     // Track initial URL
@@ -371,6 +362,11 @@ export class WorkerService extends EventEmitter {
       clearTimeout(timeoutId);
     }
     this.activeTimers.clear();
+
+    // Cancel any pending debounced calls
+    if (this.debouncedHandleUrlChange && this.debouncedHandleUrlChange.cancel) {
+      this.debouncedHandleUrlChange.cancel();
+    }
 
     this.disableUrlMonitoring();
     this.log('🧹 WorkerService cleaned up');
