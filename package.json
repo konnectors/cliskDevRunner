@@ -35,7 +35,7 @@
     "cozy-flags": "^4.7.0",
     "cozy-logger": "^1.17.0",
     "debug": "^4.4.1",
-    "express": "^4.19.2",
+    "express": "^5.0.0",
     "express-session": "^1.17.3",
     "minimist": "^1.2.8",
     "playwright": "^1.40.0",
