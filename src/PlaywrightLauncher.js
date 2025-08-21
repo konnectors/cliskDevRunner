@@ -59,9 +59,11 @@ class PlaywrightLauncher {
     }
     //////////////////////////////////////////////////////
 
+    const scopes = await loadScopesFromManifestStrict({ connectorPath, __dirname, log });
+
     this.cozyClient = await createClientInteractive({
       uri: targetedInstance,
-      scope: ['io.cozy.files'],
+      scope: scopes,
       oauth: {
         softwareID: 'cliskDevRunner'
       }
@@ -267,6 +269,48 @@ class PlaywrightLauncher {
   isReady() {
     return this.isInitialized && this.pilotPage && this.workerPage && this.pilotService && this.workerService;
   }
+}
+
+async function loadScopesFromManifestStrict({ connectorPath, __dirname, log }) {
+  const manifestPath = path.resolve(__dirname, '..', connectorPath, 'manifest.konnector');
+  log(`🔎 Reading manifest: ${manifestPath}`);
+  let raw;
+  try {
+    raw = await fs.promises.readFile(manifestPath, 'utf8');
+  } catch (err) {
+    log(`❌ Cannot read manifest file: ${err.message}`);
+    throw new Error(`Manifest not found or unreadable at ${manifestPath}`);
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(raw);
+  } catch (err) {
+    log(`❌ Invalid JSON manifest: ${err.message}`);
+    throw new Error(`Manifest JSON invalid at ${manifestPath}`);
+  }
+
+  const perms = manifest.permissions;
+  if (!perms || typeof perms !== 'object') {
+    log('❌ No "permissions" section found in manifest');
+    throw new Error(`No "permissions" in manifest at ${manifestPath}`);
+  }
+
+  const scopes = Array.from(
+    new Set(
+      Object.values(perms)
+        .map(entry => (typeof entry === 'string' ? entry : entry?.type))
+        .filter(Boolean)
+    )
+  );
+
+  if (scopes.length === 0) {
+    log('❌ No permission types found in manifest');
+    throw new Error(`No permission types found in manifest at ${manifestPath}`);
+  }
+
+  log(`✅ Loaded ${scopes.length} scope(s) from manifest`);
+  return scopes;
 }
 
 export default PlaywrightLauncher;
