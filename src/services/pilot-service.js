@@ -14,6 +14,8 @@ export class PilotService {
     this.workerService = workerService;
     this.log = debug('clisk:pilot-service');
     this.activeTimers = new Set(); // Track active timers for cleanup
+    this.handleWorkerEvent = this.handleWorkerEvent.bind(this);
+    this.workerPage.on('connection:success', this.attachWorkerEvent.bind(this));
   }
 
   /**
@@ -321,6 +323,23 @@ export class PilotService {
         throw error;
       }
     }
+  }
+
+  /**
+   * Attaches a workerEvent event listener to the worker page connection
+   * This allows handling events emitted by the worker page
+   * @returns {Promise<void>} Resolves when the event listener is attached
+   */
+  async attachWorkerEvent() {
+    this.workerPage.getConnection().remoteHandle().addEventListener('workerEvent', this.handleWorkerEvent);
+  }
+
+  /**
+   * Handles workerEvent events emitted by the worker page
+   * @param {Object} event - The event object containing event details
+   */
+  async handleWorkerEvent(event) {
+    this.pilotPage.getConnection().localHandle().emit('workerEvent', event);
   }
 
   /**
