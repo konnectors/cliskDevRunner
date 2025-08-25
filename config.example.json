@@ -1,4 +1,5 @@
 {
+  "instance": "http://cozy.localhost:8080",
   "connector": "examples/evaluate-konnector",
   "logLevel": "normal",
   "stayOpen": false,

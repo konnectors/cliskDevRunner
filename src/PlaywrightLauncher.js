@@ -140,7 +140,6 @@ class PlaywrightLauncher {
     this.pilotService = new PilotService(this.pilotPage, this.workerPage, this.workerService);
 
     this.pilotService.setLauncherClient(this.cozyClient);
-    log(`🔧 PilotService launcherClient set:`, this.pilotService.getStartContext()?.launcherClient);
 
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
 
@@ -155,7 +154,8 @@ class PlaywrightLauncher {
 
     // Load connector on both pages
     log('📦 Loading connectors on both pages...');
-    const [workerManifest, pilotManifest] = await Promise.all([this.workerPage.loadConnector(this.connectorPath, loadConnector), this.pilotPage.loadConnector(this.connectorPath, loadConnector)]);
+    await Promise.all([this.workerPage.loadConnector(this.connectorPath, loadConnector), this.pilotPage.loadConnector(this.connectorPath, loadConnector)]);
+    log('📦 Loaded');
 
     // Setup service-specific local methods
     this.pilotPage.addLocalMethods(this.pilotService.getLocalMethods());
@@ -163,7 +163,6 @@ class PlaywrightLauncher {
 
     // Enable URL monitoring for worker only (not for pilot)
     this.workerService.enableUrlMonitoring();
-    log('🔍 URL monitoring enabled for worker page');
 
     // Initiate handshakes in parallel with appropriate content script types
     const [workerConnection, pilotConnection] = await Promise.all([this.workerPage.initiateHandshake({}, 'worker'), this.pilotPage.initiateHandshake({}, 'pilot')]);
@@ -205,7 +204,7 @@ class PlaywrightLauncher {
         throw new Error('getUserDataFromWebsite did not return any sourceAccountIdentifier. Cannot continue the execution.');
       }
       this.pilotService.setUserData({ sourceAccountIdentifier: userDataResult.sourceAccountIdentifier });
-      log(`🧩 PilotService userData SAI set: ${this.pilotService.getUserData()?.sourceAccountIdentifier}`);
+      log(`🧩 PilotService userData set: ${this.pilotService.getUserData()?.sourceAccountIdentifier}`);
       log('🔐 Calling fetch on pilot...');
       await pilotConnection.remoteHandle().call('fetch', { flags: flagsWithValues });
       log('✅  fetch completed successfully!');
@@ -294,7 +293,6 @@ class PlaywrightLauncher {
 
 async function loadScopesFromManifestStrict({ connectorPath, __dirname, log }) {
   const manifestPath = path.resolve(__dirname, '..', connectorPath, 'manifest.konnector');
-  log(`🔎 Reading manifest: ${manifestPath}`);
   let raw;
   try {
     raw = await fs.promises.readFile(manifestPath, 'utf8');
@@ -330,7 +328,6 @@ async function loadScopesFromManifestStrict({ connectorPath, __dirname, log }) {
     throw new Error(`No permission types found in manifest at ${manifestPath}`);
   }
 
-  log(`✅ Loaded ${scopes.length} scope(s) from manifest`);
   return scopes;
 }
 

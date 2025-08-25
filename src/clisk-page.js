@@ -34,6 +34,7 @@ export class CliskPage extends EventEmitter {
     this.pageLog = debug(`clisk:${pageName}:page`);
     this.messageLog = debug(`clisk:${pageName}:message`);
     this.commLog = debug(`clisk:${pageName}:comm`);
+    this.postMeLog = debug(`clisk:${pageName}:post-me`);
 
     // Instance variables for isolated state
     this.page = null;
@@ -351,10 +352,10 @@ export class CliskPage extends EventEmitter {
           }
         }
       };
-      
+
       // Create ReactNativeWebView object if it doesn't exist
       window.ReactNativeWebView = window.ReactNativeWebView || {};
-      
+
       // Setup postMessage function that bridges to the host
       window.ReactNativeWebView.postMessage = function(message) {
         // Parse message if it's a string
@@ -365,7 +366,7 @@ export class CliskPage extends EventEmitter {
           pageLogger.error('❌ [${this.pageName}] Failed to parse message:', e);
           parsedMessage = { raw: message };
         }
-        
+
         // Forward post-me messages to Playwright
         if (parsedMessage.type === '@post-me') {
           if (window.sendToPlaywright) {
@@ -378,7 +379,7 @@ export class CliskPage extends EventEmitter {
           window.postMessage(parsedMessage, '*');
         }
       };
-      
+
       pageLogger.log('✅ [${this.pageName}] ReactNativeWebView and post-me bridge ready');
     `;
 
@@ -393,7 +394,7 @@ export class CliskPage extends EventEmitter {
   createMessenger() {
     return {
       postMessage: async (message, transfer) => {
-        // this.messageLog('➡️ [Playwright→%s] Sending: %O', this.pageName, message);
+        this.postMeLog('➡️ [Launcher→%s] Sending: %O', this.pageName, message);
 
         try {
           await this.page.evaluate(msg => {
@@ -413,7 +414,7 @@ export class CliskPage extends EventEmitter {
 
         // Store the listener for this page instance
         this.messageHandler = data => {
-          // this.messageLog('📨 [%s→Playwright] Received: %O', this.pageName, data);
+          this.postMeLog('📨 [%s→Launcher] Received: %O', this.pageName, data);
           listener({ data });
         };
 

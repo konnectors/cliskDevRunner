@@ -8,7 +8,7 @@ import debug from 'debug';
 // Define log levels with their corresponding debug patterns
 export const LOG_LEVELS = {
   EXTREME: 'clisk:*', // Everything - all debug namespaces
-  FULL: 'clisk:cli:*,clisk:launcher:*,clisk:*:main,clisk:*:page,clisk:*:nav,clisk:loader:*', // All main logs but no page-level details
+  FULL: 'clisk:cli:*,clisk:launcher:*,clisk:*:main,clisk:*:page,clisk:*:nav,clisk:loader:*', // All logs with post-me logs
   NORMAL: 'clisk:cli:*,clisk:launcher:*,clisk:pilot:main', // cli, launcher, + main page logs
   QUIET: '' // No debug logs
 };
