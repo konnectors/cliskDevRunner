@@ -1,6 +1,7 @@
 import debug from 'debug';
-const fs = await import('node:fs/promises');
-const path = await import('node:path');
+import fs from 'fs/promises';
+import path from 'path';
+import { saveIdentity } from 'cozy-clisk';
 const CREDENTIALS_PATH = path.join(path.dirname(new URL(import.meta.url).pathname), '../../data/credentials.json');
 
 /**
@@ -92,6 +93,11 @@ export class PilotService {
 
       saveIdentity: async contact => {
         this.log('💾 saveIdentity called: %O', contact);
+
+        const { launcherClient: client } = this.getStartContext();
+        const { sourceAccountIdentifier } = this.getUserData() || {};
+
+        await saveIdentity(contact, sourceAccountIdentifier, { client });
       },
 
       saveBills: async entries => {
@@ -435,5 +441,27 @@ export class PilotService {
     }
 
     this.log('🧹 PilotService cleaned up');
+  }
+
+  /**
+   * Getter matching mobile launcher shape for saveIdentity()
+   * Returns { launcherClient }
+   */
+  getStartContext() {
+    return { launcherClient: this._launcherClient || null };
+  }
+
+  /** Optional user data (comes from the running connector) */
+  getUserData() {
+    return this._userData || null;
+  }
+
+  /** Setters used by PlaywrightLauncher (or other services) */
+  setLauncherClient(client) {
+    this._launcherClient = client;
+  }
+
+  setUserData(userData) {
+    this._userData = userData;
   }
 }
