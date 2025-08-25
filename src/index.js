@@ -48,6 +48,7 @@ const config = new Conf({
       type: 'object',
       properties: {
         headless: { type: 'boolean', default: false },
+        devtools: { type: 'boolean', default: true },
         args: {
           type: 'array',
           default: ['--no-sandbox', '--disable-web-security']
@@ -88,6 +89,7 @@ const config = new Conf({
     profile: undefined,
     browser: {
       headless: false,
+      devtools: true,
       args: ['--no-sandbox', '--disable-web-security']
     },
     mobile: {
@@ -129,7 +131,7 @@ Options:
 Configuration:
   The application uses a configuration file that can be overridden by command line options.
   Configuration file location: ${config.path}
-  
+
   You can set default values in the config file:
   - connector: Default connector to use
   - logLevel: Default log level

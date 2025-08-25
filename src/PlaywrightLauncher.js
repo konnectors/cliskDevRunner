@@ -94,6 +94,7 @@ class PlaywrightLauncher {
     // Launch browser with configuration
     const launchOptions = {
       headless: browserConfig?.headless ?? false,
+      devtools: browserConfig?.devtools ?? false,
       args: browserConfig?.args ?? ['--no-sandbox', '--disable-web-security']
     };
 
