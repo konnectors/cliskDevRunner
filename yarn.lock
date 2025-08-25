@@ -110,9 +110,9 @@
     redux "^4.0.0"
 
 "@types/react@*":
-  version "19.1.10"
-  resolved "https://registry.yarnpkg.com/@types/react/-/react-19.1.10.tgz#a05015952ef328e1b85579c839a71304b07d21d9"
-  integrity sha512-EhBeSYX0Y6ye8pNebpKrwFJq7BoQ8J5SO6NlvNwwHjSj6adXJViPQrKlsyPw7hLBLvckEMO1yxeGdR82YBBlDg==
+  version "19.1.11"
+  resolved "https://registry.yarnpkg.com/@types/react/-/react-19.1.11.tgz#a64d8ec1769fc861d22f54e6e9f360ed67b54dc8"
+  integrity sha512-lr3jdBw/BGj49Eps7EvqlUaoeA0xpj3pc0RoJkHpYaCHkVK7i28dKyImLQb3JVlqs3aYSXf7qYuWOW/fgZnTXQ==
   dependencies:
     csstype "^3.0.2"
 
@@ -381,9 +381,9 @@ cookie@0.7.2, cookie@^0.7.1:
   integrity sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==
 
 cozy-client@^60.1.1:
-  version "60.1.1"
-  resolved "https://registry.yarnpkg.com/cozy-client/-/cozy-client-60.1.1.tgz#6d25155e72602a7660db6d39a8361039013537ba"
-  integrity sha512-Wxej4HBFukzrQdlH4ARaSGumM8t2IqKZtyBLkHecYQEpRsIbhwYgcB/f08f8bmvYEyBDLbGbqBZua1KNm4M88Q==
+  version "60.2.0"
+  resolved "https://registry.yarnpkg.com/cozy-client/-/cozy-client-60.2.0.tgz#2f5cc0e1a1fa844ba5e2aeb530058cd72bdb42b7"
+  integrity sha512-oLK+97bH/iWDeBdgfd+5CcLCCvKUG7hjVzCg0J7bcn8Nef1ODePUvxiElootTfhb/qtAcc2ZbxwSg2SKI+2hBQ==
   dependencies:
     "@cozy/minilog" "1.0.0"
     "@fastify/deepmerge" "^2.0.2"
