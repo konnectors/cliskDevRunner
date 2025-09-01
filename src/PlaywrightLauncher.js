@@ -28,6 +28,7 @@ class PlaywrightLauncher {
     this.workerService = null;
     this.connectorPath = null;
     this.isInitialized = false;
+    this.destinationFolder = null;
   }
 
   async init(connectorPath = 'examples/evaluate-konnector', options = {}) {
@@ -37,7 +38,10 @@ class PlaywrightLauncher {
     this.connectorPath = connectorPath;
 
     // Get configuration options
-    const { profile, browser: browserConfig, mobile: mobileConfig, targetedInstance } = options;
+    const { profile, browser: browserConfig, mobile: mobileConfig, targetedInstance, destinationFolder } = options;
+
+    this.destinationFolder = destinationFolder;
+    log('📦 destinationFolder set on launcher: %s', this.destinationFolder);
 
     /* TO COMMENT IF YOU DONT NEED TO READ CREDENTIALS FROM FILE */
     let credentials;
@@ -139,6 +143,8 @@ class PlaywrightLauncher {
     this.workerService = new WorkerService(this.workerPage);
     this.pilotService = new PilotService(this.pilotPage, this.workerPage, this.workerService);
 
+    this.pilotService.destinationFolder = this.destinationFolder;
+
     this.pilotService.setLauncherClient(this.cozyClient);
 
     // Initialize pages SEQUENTIALLY to avoid Playwright exposeFunction conflicts
@@ -154,7 +160,8 @@ class PlaywrightLauncher {
 
     // Load connector on both pages
     log('📦 Loading connectors on both pages...');
-    await Promise.all([this.workerPage.loadConnector(this.connectorPath, loadConnector), this.pilotPage.loadConnector(this.connectorPath, loadConnector)]);
+    const [konnector] = await Promise.all([this.workerPage.loadConnector(this.connectorPath, loadConnector), this.pilotPage.loadConnector(this.connectorPath, loadConnector)]);
+    this.pilotService.setKonnector(konnector);
     log('📦 Loaded');
 
     // Setup service-specific local methods
@@ -288,6 +295,10 @@ class PlaywrightLauncher {
 
   isReady() {
     return this.isInitialized && this.pilotPage && this.workerPage && this.pilotService && this.workerService;
+  }
+
+  getDestinationFolder() {
+    return this.destinationFolder;
   }
 }
 
