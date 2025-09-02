@@ -1,7 +1,8 @@
 import debug from 'debug';
 import fs from 'fs/promises';
 import path from 'path';
-import { saveIdentity } from 'cozy-clisk';
+import { saveIdentity, saveFiles } from 'cozy-clisk';
+import { Q } from 'cozy-client';
 const CREDENTIALS_PATH = path.join(path.dirname(new URL(import.meta.url).pathname), '../../data/credentials.json');
 
 /**
@@ -16,6 +17,8 @@ export class PilotService {
     this.log = debug('clisk:pilot-service');
     this.activeTimers = new Set(); // Track active timers for cleanup
     this.handleWorkerEvent = this.handleWorkerEvent.bind(this);
+    this._firstFileSave = true;
+    this.destinationFolder = null; // will be set by PlaywrightLauncher
     this.workerPage.on('connection:success', this.attachWorkerEvent.bind(this));
   }
 
@@ -104,7 +107,52 @@ export class PilotService {
         this.log('💾 saveBills called: %O', entries);
       },
 
-      saveFiles: async entries => {
+      saveFiles: async (entries, options) => {
+        this.log('💾 saveFiles called');
+        await this.ensureKonnectorFolder();
+
+        const { launcherClient: client, konnector, destinationFolder } = this.getStartContext() || {};
+        const { sourceAccountIdentifier } = this.getUserData() || {};
+
+        if (!destinationFolder) {
+          throw new Error('saveFiles: destinationFolder is not defined');
+        }
+        const folderPath = (destinationFolder.startsWith('/') ? destinationFolder : `/${destinationFolder}`) + `/${konnector.slug}`;
+
+        const existingFilesIndex = await this.getExistingFilesIndex(this.shouldResetFileIndex());
+
+        const saveFilesOptions = {
+          ...options,
+          manifest: konnector,
+          // @ts-ignore
+          sourceAccount: 'testaccountid',
+          sourceAccountIdentifier,
+          // @ts-ignore
+          downloadAndFormatFile: async entry => ({
+            ...entry,
+            // @ts-ignore
+            dataUri: await this.workerPage.getConnection().remoteHandle().call('downloadFileInWorker', entry)
+          }),
+          existingFilesIndex,
+          log: this.log.bind(this)
+        };
+
+        try {
+          const result = await saveFiles(client, entries, folderPath, saveFilesOptions);
+          return result;
+        } catch (err) {
+          if (
+            (err instanceof Error && err.message !== 'MAIN_FOLDER_REMOVED') ||
+            !(err instanceof Error) // instanceof Error is here to fix typing error
+          ) {
+            throw err;
+          }
+          // main destination folder has been removed during the execution of the konnector. Trying one time to reset all and relaunch saveFiles
+          return await this.retrySaveFiles(entries, saveFilesOptions);
+        }
+      },
+
+      localSaveFiles: async entries => {
         this.log('💾 saveFiles called');
         await this.waitForReconnectionIfInProgress();
         const workerConnection = this.workerPage.getConnection();
@@ -448,7 +496,7 @@ export class PilotService {
    * Returns { launcherClient }
    */
   getStartContext() {
-    return { launcherClient: this._launcherClient || null };
+    return { konnector: this.konnector, launcherClient: this._launcherClient || null, destinationFolder: this.destinationFolder };
   }
 
   /** Optional user data (comes from the running connector) */
@@ -463,5 +511,119 @@ export class PilotService {
 
   setUserData(userData) {
     this._userData = userData;
+  }
+
+  // file methods
+  shouldResetFileIndex() {
+    if (this._firstFileSave) {
+      this._firstFileSave = false;
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  /**
+   * Get the index of existing files for the current konnector and the current sourceAccountIdentifier
+   * The result is cached in this.existingFilesIndex to optimize the response time for multiple calls to saveFiles
+   *
+   * @return {Promise<Map<String, import('cozy-client/types/types').FileDocument>>} - index of existing files
+   */
+  async getExistingFilesIndex(reset = false) {
+    this.log('🔨 getExistingFilesIndex starts');
+    if (!reset && this.existingFilesIndex) {
+      return this.existingFilesIndex;
+    }
+
+    const { sourceAccountIdentifier } = this.getUserData() || {};
+    const { konnector, launcherClient: client } = this.getStartContext();
+    const createdByApp = konnector.slug;
+    if (!sourceAccountIdentifier) {
+      throw new Error('getExistingFilesIndex: unexpected undefined sourceAccountIdentifier');
+    }
+
+    const existingFiles = await client.queryAll(
+      Q('io.cozy.files')
+        .where({
+          trashed: false,
+          cozyMetadata: {
+            sourceAccountIdentifier,
+            createdByApp
+          }
+        })
+        .indexFields(['cozyMetadata.createdByApp', 'cozyMetadata.sourceAccountIdentifier', 'trashed'])
+        .select(['metadata', 'cozyMetadata', 'name', 'dir_id', 'size', 'md5sum', 'mime', 'trashed'])
+    );
+    // @ts-ignore
+    const existingFilesIndex = existingFiles.reduce((map, file) => {
+      if (file.metadata?.fileIdAttributes) {
+        // files without metadata will be replaced
+        map.set(file.metadata.fileIdAttributes, file);
+      }
+      return map;
+    }, new Map());
+    return (this.existingFilesIndex = existingFilesIndex);
+  }
+
+  /**
+   * Rerun the saveFiles function after have reindexed files and created the destination folder
+   * @param {Array<FileDocument>} entries - list of file entries to save
+   * @param {object} options - options object
+   * @returns {Promise<Array<object>>} list of saved files
+   */
+  async retrySaveFiles(entries, options) {
+    this.log('🔨 retrySaveFiles starts');
+    const { launcherClient: client, konnector, destinationFolder } = this.getStartContext() || {};
+    if (!destinationFolder) {
+      throw new Error('retrySaveFiles: destinationFolder is not defined');
+    }
+    const folderPath = (destinationFolder.startsWith('/') ? destinationFolder : `/${destinationFolder}`) + `/${konnector.slug}`;
+    this.log('saveFiles: Destination folder removed during konnector execution, trying again');
+    const updatedFilesIndex = await this.getExistingFilesIndex(true); // update files index since the destination folder was removed
+
+    return await saveFiles(client, entries, folderPath, {
+      ...options,
+      existingFilesIndex: updatedFilesIndex
+    });
+  }
+
+  async ensureKonnectorFolder() {
+    this.log('🔨 ensureKonnectorFolder starts');
+    const { konnector, destinationFolder, launcherClient: client } = this.getStartContext();
+    if (!destinationFolder) {
+      throw new Error('ensureKonnectorFolder: destinationFolder is not defined');
+    }
+    const folderPath = destinationFolder + '/' + konnector.slug;
+    this.log('🔍 ensureKonnectorFolder ' + folderPath);
+    const fileCollection = client.collection('io.cozy.files');
+
+    const { data: folder } = (await this.statDirectoryByPath(fileCollection, folderPath)) || (await fileCollection.createDirectoryByPath(folderPath));
+    return folder;
+  }
+
+  /**
+   * Retrieves a directory from its path
+   *
+   * @param  {CozyClient}  client CozyClient
+   * @param  {string}  path   Directory path
+   * @returns {Promise<import('../types').IOCozyFolder|null>}        Created io.cozy.files document
+   * @throws will throw an error on any error without status === 404
+   */
+  async statDirectoryByPath(fileCollection, path) {
+    this.log('🔨 statDirectoryByPath starts');
+    try {
+      const response = await fileCollection.statByPath(path);
+      if (response.data.trashed) {
+        return null;
+      }
+      return response.data;
+    } catch (error) {
+      if (error && error.status === 404) return null;
+      throw new Error(error.message);
+    }
+  }
+
+  setKonnector(konnector) {
+    this.konnector = konnector;
   }
 }

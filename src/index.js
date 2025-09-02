@@ -23,6 +23,10 @@ const config = new Conf({
   configName: 'config',
   cwd: process.cwd(),
   schema: {
+    destinationFolder: {
+      type: 'string',
+      default: '/cliskDevRunner'
+    },
     instance: {
       type: 'string',
       default: undefined
@@ -87,6 +91,7 @@ const config = new Conf({
     logLevel: 'normal',
     stayOpen: false,
     profile: undefined,
+    destinationFolder: '/cliskDevRunner',
     browser: {
       headless: false,
       devtools: true,
@@ -189,6 +194,7 @@ if (argv['domain']) {
 const connectorPath = config.get('connector');
 let logLevel = config.get('logLevel');
 const targetedInstance = config.get('instance');
+const destinationFolder = config.get('destinationFolder');
 
 // Check if DEBUG is explicitly set to empty (quiet mode from npm script)
 if (process.env.DEBUG === '') {
@@ -204,6 +210,7 @@ async function main() {
   log(`⚙️  Targeted Instance: ${targetedInstance}`);
   log(`📁 Using connector: ${connectorPath}`);
   log(`⚙️  Configuration file: ${config.path}`);
+  log(`⚙️  Destination Folder: ${destinationFolder}`);
   if (logLevel.toLowerCase() !== 'quiet') {
     log(`🔧 Log level: ${logLevel.toUpperCase()}`);
   }
@@ -224,7 +231,8 @@ async function main() {
       profile: profile,
       browser: config.get('browser'),
       mobile: config.get('mobile'),
-      targetedInstance: targetedInstance
+      targetedInstance: targetedInstance,
+      destinationFolder: destinationFolder
     });
     await launcher.start();
 

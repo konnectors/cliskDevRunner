@@ -5773,11 +5773,20 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
     await this.waitForElementInWorker(
       'form[action="/logout"], form[action="/login"]'
     )
+    this.log('info', '🤖 navigateToLoginForm END')
+  }
+  sendWorkerEvent() {
+    this.log('info', '🤖 sendWorkerEvent')
+    this.bridge.emit('workerEvent', {
+      event: 'testWorkerEvent',
+      payload: { msg: 'yo' }
+    })
   }
   async ensureAuthenticated() {
     this.bridge.addEventListener('workerEvent', this.onWorkerEvent.bind(this))
     this.log('info', '🤖 ensureAuthenticated')
     await this.navigateToLoginForm()
+    await this.runInWorker('sendWorkerEvent')
     const authenticated = await this.runInWorker('checkAuthenticated')
     if (!authenticated) {
       this.log('info', 'Not authenticated')
@@ -5816,16 +5825,33 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
 
   async showLoginFormAndWaitForAuthentication() {
     this.log('info', '🤖 showLoginFormAndWaitForAuthentication')
-    await this.show()
+    await this.setWorkerState({ visible: true })
     await this.runInWorkerUntilTrue({
       method: 'waitForAuthenticated'
     })
-    await this.hide()
+    await this.setWorkerState({ visible: false })
   }
 
-  fetch() {
+  async fetch(context) {
     this.log('info', '🤖 fetch')
+    const entries = await this.runInWorker('getFiles')
+    await this.saveFiles(entries, {
+      contentType: 'application/pdf',
+      fileIdAttributes: ['filename'],
+      context
+    })
   }
+
+  async getFiles () {
+    this.log('info', '📍️ getFiles starts')
+    return Array.from(document.querySelectorAll('a[download]')).map(el => {
+      return {
+        filename: el.innerText,
+        fileurl: baseUrl + el.getAttribute('href')
+      }
+    })
+  }
+
 
   onWorkerEvent({ event, payload }) {
     this.log('info', '🤖 onWorkerEvent ' + JSON.stringify({ event, payload }))
@@ -5833,9 +5859,11 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
 }
 
 const connector = new TemplateContentScript()
-connector.init().catch(err => {
-  log.warn(err)
-})
+connector
+  .init({ additionalExposedMethodsNames: ['sendWorkerEvent', 'getFiles'] })
+  .catch(err => {
+    log.warn(err)
+  })
 
 })();
 
