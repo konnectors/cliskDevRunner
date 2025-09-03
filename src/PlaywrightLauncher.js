@@ -72,6 +72,9 @@ class PlaywrightLauncher {
       scope: scopes,
       oauth: {
         softwareID: 'cliskDevRunner'
+      },
+      appMetadata: {
+        slug: 'cliskDevRunner'
       }
     });
 
