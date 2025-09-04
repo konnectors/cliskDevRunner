@@ -96,10 +96,8 @@ export class PilotService {
 
       saveIdentity: async contact => {
         this.log('💾 saveIdentity called: %O', contact);
-
         const { launcherClient: client } = this.getStartContext();
         const { sourceAccountIdentifier } = this.getUserData() || {};
-
         await saveIdentity(contact, sourceAccountIdentifier, { client });
       },
 

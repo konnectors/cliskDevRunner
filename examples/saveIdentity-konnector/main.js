@@ -5780,15 +5780,23 @@ class TemplateContentScript extends cozy_clisk_dist_contentscript__WEBPACK_IMPOR
     }
   }
   async fetch(context) {
-    await this.saveIdentity({contact: {
-      name:{
-        givenName: 'Bilbo',
-        familyName: 'Baggins'
-      },
-      email : [
-        'bilbo.baggins@theshire.me'
-      ]
-    }})
+    await this.saveIdentity({
+      contact: {
+        name: {
+          givenName: 'Bilbo',
+          familyName: 'Baggins'
+        },
+        address: [
+          {
+            street: '1 Fond de sac',
+            postcode: '00000',
+            city: 'The Shire',
+            formattedAddress: '1 Fond de sac 00000 The Shire'
+          }
+        ],
+        email: [{ address: 'bilbo.baggins@theshire.me' }]
+      }
+    })
   }
 }
 
