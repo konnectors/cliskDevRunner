@@ -3,9 +3,9 @@
 
 
 "@babel/runtime@^7.15.4", "@babel/runtime@^7.9.2":
-  version "7.28.3"
-  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.28.3.tgz#75c5034b55ba868121668be5d5bb31cc64e6e61a"
-  integrity sha512-9uIQ10o0WGdpP6GDhXcdOJPJuDgFtIDtN/9+ArJQ2NAfAmiuhTQdzkaTGR33v43GYS2UrSA0eX2pPPHoFVvpxA==
+  version "7.28.4"
+  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.28.4.tgz#a70226016fabe25c5783b2f22d3e1c9bc5ca3326"
+  integrity sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==
 
 "@cozy/minilog@1.0.0", "@cozy/minilog@^1.0.0":
   version "1.0.0"
@@ -93,9 +93,9 @@
   integrity sha512-H3MHACvFUEiujabxhaI/ImO6gUrd8oOurg7LQtS7mbwIXA/cUqWrvBsaeJ23aZEPk1TAYkurjfMbSELfoCXlGA==
 
 "@types/node@*":
-  version "24.3.0"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.3.0.tgz#89b09f45cb9a8ee69466f18ee5864e4c3eb84dec"
-  integrity sha512-aPTXCrfwnDLj4VvXrm+UUCQjNEvJgNA8s5F1cvwQU+3KNltTOkBm1j30uNLyqqPNe7gE3KFzImYoZEfLhp4Yow==
+  version "24.3.1"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-24.3.1.tgz#b0a3fb2afed0ef98e8d7f06d46ef6349047709f3"
+  integrity sha512-3vXmQDXy+woz+gnrTvuvNrPzekOi+Ds0ReMxw0LzBiK3a+1k0kQn9f2NWk+lgD4rJehFUmYy2gMhJ2ZI+7YP9g==
   dependencies:
     undici-types "~7.10.0"
 
@@ -110,9 +110,9 @@
     redux "^4.0.0"
 
 "@types/react@*":
-  version "19.1.10"
-  resolved "https://registry.yarnpkg.com/@types/react/-/react-19.1.10.tgz#a05015952ef328e1b85579c839a71304b07d21d9"
-  integrity sha512-EhBeSYX0Y6ye8pNebpKrwFJq7BoQ8J5SO6NlvNwwHjSj6adXJViPQrKlsyPw7hLBLvckEMO1yxeGdR82YBBlDg==
+  version "19.1.12"
+  resolved "https://registry.yarnpkg.com/@types/react/-/react-19.1.12.tgz#7bfaa76aabbb0b4fe0493c21a3a7a93d33e8937b"
+  integrity sha512-cMoR+FoAf/Jyq6+Df2/Z41jISvGZZ2eTlnsaJRptmZ76Caldwy1odD4xTr/gNV9VLj0AWgg/nmkevIyUfIIq5w==
   dependencies:
     csstype "^3.0.2"
 
@@ -381,16 +381,16 @@ cookie@0.7.2, cookie@^0.7.1:
   integrity sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==
 
 cozy-client@^60.1.1:
-  version "60.1.1"
-  resolved "https://registry.yarnpkg.com/cozy-client/-/cozy-client-60.1.1.tgz#6d25155e72602a7660db6d39a8361039013537ba"
-  integrity sha512-Wxej4HBFukzrQdlH4ARaSGumM8t2IqKZtyBLkHecYQEpRsIbhwYgcB/f08f8bmvYEyBDLbGbqBZua1KNm4M88Q==
+  version "60.6.0"
+  resolved "https://registry.yarnpkg.com/cozy-client/-/cozy-client-60.6.0.tgz#dc7d23de9aee1412c70020af406fd9a10af96bbc"
+  integrity sha512-yPg79OJuYm1uVOgIm6hYj8ef2TUCGxVQ2E5RM0VwvsW6ZzfcYunln2enJzv8KJW2r4lsPSnBoF4yBCiUTToIpg==
   dependencies:
     "@cozy/minilog" "1.0.0"
     "@fastify/deepmerge" "^2.0.2"
     "@types/jest" "^26.0.20"
     "@types/lodash" "^4.14.170"
     btoa "^1.2.1"
-    cozy-stack-client "^60.1.0"
+    cozy-stack-client "^60.6.0"
     date-fns "2.29.3"
     fast-deep-equal "^3.1.3"
     json-stable-stringify "^1.0.1"
@@ -443,10 +443,10 @@ cozy-logger@^1.17.0:
     chalk "^2.4.2"
     json-stringify-safe "5.0.1"
 
-cozy-stack-client@^60.1.0:
-  version "60.1.0"
-  resolved "https://registry.yarnpkg.com/cozy-stack-client/-/cozy-stack-client-60.1.0.tgz#73efcfc578d012d68ffcf63de76378bba6ca4c90"
-  integrity sha512-LBhbEnEdvn+MgbFHuYgIDzdZm5jUgAQsvdNkFWUlS15xTe1zMY/+/GHPk3+b4sswrveu0JKTF1ptjV8FNzbnGQ==
+cozy-stack-client@^60.6.0:
+  version "60.6.0"
+  resolved "https://registry.yarnpkg.com/cozy-stack-client/-/cozy-stack-client-60.6.0.tgz#7819415ba8025dde8a3728f489b9f545a0f6d759"
+  integrity sha512-p1AIa7RAh0807moLbzIftnfDRFL5D5w2idopmZZ3peuKkoD1dnCHXppVUVVupM7/CwOg3NIrX2kYvdyvbrxpww==
   dependencies:
     detect-node "^2.0.4"
     mime "^2.4.0"
