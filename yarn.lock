@@ -421,12 +421,10 @@ cozy-clisk@^0.42.0:
     p-wait-for "^5.0.2"
     post-me "^0.4.5"
 
-cozy-device-helper@^3.8.0:
-  version "3.8.0"
-  resolved "https://registry.yarnpkg.com/cozy-device-helper/-/cozy-device-helper-3.8.0.tgz#89b2947198c39b3b57dc6c6273243045eb470b40"
-  integrity sha512-c//90YvZ5uIxhyWJy/9g8XTHVsST5eW4Nsd6+BXg9LJ/YVt3RO2HMjd1Afxvbg1fOcRMr5y1nkiLoFhTeiM35Q==
-  dependencies:
-    lodash "^4.17.19"
+cozy-device-helper@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/cozy-device-helper/-/cozy-device-helper-4.0.0.tgz#690bcbf5f5720a90c8d71465aa43e584948ec204"
+  integrity sha512-vxNZqFtnBizvtP8EreOZzzOdaVd/fo+0f5/FqSeyFNz/epiiGtwW/1OZ0A8h06Q0wNesnhwDB/kZ9qvhay0/DA==
 
 cozy-flags@^4.7.0:
   version "4.7.0"
@@ -1182,7 +1180,7 @@ lodash.debounce@^4.0.8:
   resolved "https://registry.yarnpkg.com/lodash.debounce/-/lodash.debounce-4.0.8.tgz#82d79bff30a67c4005ffd5e2515300ad9ca4d7af"
   integrity sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==
 
-lodash@^4.17.13, lodash@^4.17.19, lodash@^4.17.21:
+lodash@^4.17.13, lodash@^4.17.21:
   version "4.17.21"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.21.tgz#679591c564c3bffaae8454cf0b3df370c3d6911c"
   integrity sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==
