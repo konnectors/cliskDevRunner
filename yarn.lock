@@ -436,9 +436,9 @@ cozy-flags@^4.7.0:
     microee "^0.0.6"
 
 cozy-logger@^1.17.0:
-  version "1.17.0"
-  resolved "https://registry.yarnpkg.com/cozy-logger/-/cozy-logger-1.17.0.tgz#5fef0bbbe0313a72f5c612fa3b2de904f995c668"
-  integrity sha512-YihcmbE1OMcNuyEmmVjp/a9p29gIm+dn7xG0Lmp5xE90K2CSinDLRv99U0ppr9UC5ez46jXUN+cb/zFsaeAuow==
+  version "1.18.3"
+  resolved "https://registry.yarnpkg.com/cozy-logger/-/cozy-logger-1.18.3.tgz#386f6c7233656b2372f3e3ee347bc85aaa3b433c"
+  integrity sha512-MsHO/0Vo6bdB97mUi2t1I9ONTHD+Yr0m4YK9JUTLl83Orj41H4JtgxGYW+LSgMGHBvxl2MajHAaUt84uwErR4A==
   dependencies:
     chalk "^2.4.2"
     json-stringify-safe "5.0.1"
